@@ -141,7 +141,7 @@ export default function RewardsScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-24 font-sans max-w-lg mx-auto shadow-lg border-x border-gray-100">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100">
       
       {/* Dynamic Toast Alert */}
       {toastMessage && (
@@ -152,7 +152,7 @@ export default function RewardsScreen({
       )}
 
       {/* Sticky Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-lg mx-auto border-b border-gray-100">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/85 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-md mx-auto border-b border-gray-100">
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -185,7 +185,7 @@ export default function RewardsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 pt-20 px-4 space-y-5">
+      <main className="flex-1 w-full max-w-md mx-auto pt-20 pb-16 px-4 space-y-5">
 
         {/* Mandatory Notice Banner */}
         <section className="bg-amber-50/50 border border-amber-200/60 rounded-3xl p-4 flex gap-3 items-start shadow-3xs">
@@ -386,12 +386,12 @@ export default function RewardsScreen({
         </section>
 
         {/* Recently onboarded verification status lists */}
-        <section className="bg-white rounded-3xl p-5 shadow-xs border border-gray-200/60 space-y-3.5">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+        <section className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-gray-200/60 space-y-3.5 overflow-hidden">
+          <div className="flex justify-between items-center gap-2">
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider truncate">
               Recent Onboarding Pipeline
             </h3>
-            <span className="text-[10px] text-gray-400 font-bold">Latest 5 of {allShops.length} entries</span>
+            <span className="text-[10px] text-gray-400 font-bold shrink-0">Latest 5 of {allShops.length} entries</span>
           </div>
 
           <div className="space-y-2.5">
@@ -401,14 +401,14 @@ export default function RewardsScreen({
               return (
                 <div 
                   key={shop.id}
-                  className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center text-xs"
+                  className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center text-xs gap-2 overflow-hidden"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-gray-900 truncate">{shop.name}</p>
-                    <p className="text-[9.5px] text-gray-400 font-bold block mt-0.5">{shop.code} • Onboarded: {shop.onboardedDate}</p>
+                    <p className="text-[9.5px] text-gray-400 font-bold block mt-0.5 truncate">{shop.code} • Onboarded: {shop.onboardedDate}</p>
                   </div>
 
-                  <div className="text-right shrink-0 ml-3 flex items-center gap-2">
+                  <div className="text-right shrink-0 ml-2 flex items-center gap-2">
                     <div className="text-right">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-black ${
                         isVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
@@ -416,17 +416,17 @@ export default function RewardsScreen({
                         {shop.status}
                       </span>
                       {!isVerified && (
-                        <p className="text-[9px] text-gray-400 font-semibold block mt-1">Needs {15 - shop.activeScansCount} active scans</p>
+                        <p className="text-[9px] text-gray-400 font-semibold block mt-1">Needs {15 - shop.activeScansCount} scans</p>
                       )}
                     </div>
 
                     {!isVerified && (
                       <button
                         onClick={() => handleForceQualifyShop(shop.id, shop.name)}
-                        className="bg-emerald-600 text-white p-1.5 rounded-xl text-[10px] font-bold shadow-2xs hover:bg-emerald-700 active:scale-90 cursor-pointer"
+                        className="bg-emerald-600 text-white p-2 rounded-xl text-[10px] font-bold shadow-2xs hover:bg-emerald-700 active:scale-90 cursor-pointer shrink-0 flex items-center justify-center"
                         title="Audit & Qualify"
                       >
-                        <Check size={11} className="stroke-[3px]" />
+                        <Check size={13} className="stroke-[3px]" />
                       </button>
                     )}
                   </div>

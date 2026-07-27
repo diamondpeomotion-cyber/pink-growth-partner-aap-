@@ -40,7 +40,7 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col font-sans">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen overflow-x-hidden flex flex-col font-sans">
       {/* TopAppBar */}
       <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100">
         <div className="flex items-center justify-between px-5 h-16 w-full">

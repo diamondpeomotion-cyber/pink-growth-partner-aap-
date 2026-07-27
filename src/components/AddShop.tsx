@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import MapPreview from './MapPreview';
+import CancellationPolicyModal from './CancellationPolicyModal';
 import { 
   ArrowLeft, 
   User, 
@@ -9,7 +10,9 @@ import {
   CheckCircle2, 
   AlertCircle, 
   X, 
-  ChevronRight, 
+  ChevronRight,
+  Plus,
+ 
   Languages,
   Store,
   MapPin,
@@ -30,7 +33,7 @@ import {
   Briefcase,
   Save,
   Scissors,
-  Plus,
+
   IdCard,
   Info
 } from 'lucide-react';
@@ -46,6 +49,7 @@ const FORM_STEPS = [
 
 export default function AddShop({ onBack, onComplete }: { onBack: () => void, onComplete?: () => void }) {
   const [currentStep, setCurrentStep] = useState<number>(2);
+  const [showStepper, setShowStepper] = useState(true);
 
   // Step 1 State: Owner Details
   const [ownerName, setOwnerName] = useState('Sunita Sharma');
@@ -116,11 +120,13 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [confirmAccurate, setConfirmAccurate] = useState<boolean>(true);
   const [authorizeProfile, setAuthorizeProfile] = useState<boolean>(true);
   const [step6Confirmed, setStep6Confirmed] = useState<boolean>(false);
+  const [policyConfirmed, setPolicyConfirmed] = useState<boolean>(false);
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState<boolean>(false);
 
   // Photo Capture State
-  const [shopPhoto, setShopPhoto] = useState<string | null>(
+  const [shopPhotos, setShopPhotos] = useState<string[]>([
     'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=800&auto=format&fit=crop'
-  );
+  ]);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   
@@ -186,7 +192,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         if (parsed.fullAddress !== undefined) setFullAddress(parsed.fullAddress);
         if (parsed.pincode !== undefined) setPincode(parsed.pincode);
         if (parsed.landmark !== undefined) setLandmark(parsed.landmark);
-        if (parsed.shopPhoto !== undefined) setShopPhoto(parsed.shopPhoto);
+        if (parsed.shopPhotos !== undefined) setShopPhotos(parsed.shopPhotos);
+        else if (parsed.shopPhoto !== undefined) setShopPhotos([parsed.shopPhoto]);
         if (parsed.gstin !== undefined) setGstin(parsed.gstin);
         if (parsed.businessType !== undefined) setBusinessType(parsed.businessType);
         if (parsed.annualTurnover !== undefined) setAnnualTurnover(parsed.annualTurnover);
@@ -219,7 +226,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         fullAddress,
         pincode,
         landmark,
-        shopPhoto,
+        shopPhotos,
         gstin,
         businessType,
         annualTurnover,
@@ -253,7 +260,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     fullAddress,
     pincode,
     landmark,
-    shopPhoto,
+    shopPhotos,
     gstin,
     businessType,
     annualTurnover,
@@ -280,7 +287,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       fullAddress,
       pincode,
       landmark,
-      shopPhoto,
+      shopPhotos,
       gstin,
       businessType,
       annualTurnover,
@@ -351,22 +358,24 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        setShopPhoto(dataUrl);
+        setShopPhotos(prev => [...prev, dataUrl]);
         stopCamera();
       }
     }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setShopPhoto(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach((file: File) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setShopPhotos(prev => [...prev, reader.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -380,10 +389,10 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
 
   return (
-    <div className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans">
+    <div className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans w-full max-w-md mx-auto overflow-x-hidden relative flex flex-col">
       {/* Toast Alert for Draft */}
       {draftSaved && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm animate-fade-in">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm animate-fade-in w-[90%] max-w-sm">
           <CheckCircle2 size={18} className="text-emerald-400" />
           Draft saved successfully on this device!
         </div>
@@ -395,7 +404,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         ref={fileInputRef} 
         onChange={handleFileUpload} 
         accept="image/*" 
-        className="hidden" 
+        className="hidden"
+        multiple
       />
       <input 
         type="file" 
@@ -407,7 +417,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       />
 
       {/* Top App Bar */}
-      <header className="sticky top-0 w-full z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm flex items-center justify-between px-4 md:px-8 h-16">
+      <header className="sticky top-0 w-full z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm flex items-center justify-between px-4 h-16">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => {
@@ -423,73 +433,92 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
             <ArrowLeft size={20} className="text-gray-700" />
           </button>
           <div>
-            <h1 className="font-bold text-gray-900 text-lg md:text-xl">Add New Shop</h1>
+            <h1 className="font-bold text-gray-900 text-lg">Add New Shop</h1>
             <p className="text-xs text-gray-500 font-medium">Step {currentStep} of 6</p>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="px-4 md:px-8 max-w-3xl mx-auto pt-6 pb-32 flex flex-col gap-6">
+      <main className="px-4 pt-6 pb-32 flex flex-col gap-6 w-full">
         {/* Progress Indicator */}
-        <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Progress</span>
-            <span className="text-xs font-bold text-primary">{Math.round((currentStep / 6) * 100)}% Complete</span>
-          </div>
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary rounded-full transition-all duration-500" 
-              style={{ width: `${(currentStep / 6) * 100}%` }}
-            ></div>
-          </div>
+        {showStepper ? (
+          <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm relative transition-all">
+            <button 
+              onClick={() => setShowStepper(false)} 
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full p-1 cursor-pointer transition-colors"
+              title="Dismiss Progress Tracker"
+            >
+              <X size={14} />
+            </button>
+            <div className="flex justify-between items-center mb-2 pr-8">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Registration Progress</span>
+              <span className="text-xs font-bold text-primary">{Math.round((currentStep / 6) * 100)}% Complete</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary rounded-full transition-all duration-500" 
+                style={{ width: `${(currentStep / 6) * 100}%` }}
+              ></div>
+            </div>
 
-          {/* Breadcrumbs / Steps */}
-          <div className="mt-4 flex items-center gap-1.5 overflow-x-auto pb-1 whitespace-nowrap text-xs no-scrollbar">
-            {FORM_STEPS.map((step, idx) => {
-              const StepIcon = step.icon;
-              const isActive = currentStep === step.id;
-              const isCompleted = isStepValid(step.id) && step.id < currentStep;
-              const isAccessible = canNavigateToStep(step.id);
+            {/* Breadcrumbs / Steps */}
+            <div className="mt-4 flex items-center gap-1.5 overflow-x-auto pb-1 whitespace-nowrap text-xs no-scrollbar">
+              {FORM_STEPS.map((step, idx) => {
+                const StepIcon = step.icon;
+                const isActive = currentStep === step.id;
+                const isCompleted = isStepValid(step.id) && step.id < currentStep;
+                const isAccessible = canNavigateToStep(step.id);
 
-              return (
-                <React.Fragment key={step.id}>
-                  {idx > 0 && (
-                    <ChevronRight 
-                      size={14} 
-                      className={`shrink-0 transition-colors ${
-                        step.id <= currentStep ? 'text-primary/60' : 'text-gray-300'
-                      }`} 
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleStepChange(step.id)}
-                    disabled={!isAccessible}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 select-none ${
-                      isActive
-                        ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20 scale-102'
-                        : isCompleted
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                        : isAccessible
-                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
-                        : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <Check size={13} className="text-emerald-600 shrink-0" />
-                    ) : !isAccessible ? (
-                      <Lock size={12} className="text-gray-300 shrink-0" />
-                    ) : (
-                      <StepIcon size={13} className="shrink-0" />
+                return (
+                  <React.Fragment key={step.id}>
+                    {idx > 0 && (
+                      <ChevronRight 
+                        size={14} 
+                        className={`shrink-0 transition-colors ${
+                          step.id <= currentStep ? 'text-primary/60' : 'text-gray-300'
+                        }`} 
+                      />
                     )}
-                    <span>{step.name}</span>
-                  </button>
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </section>
+                    <button
+                      type="button"
+                      onClick={() => handleStepChange(step.id)}
+                      disabled={!isAccessible}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 select-none ${
+                        isActive
+                          ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20 scale-102'
+                          : isCompleted
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                          : isAccessible
+                          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
+                          : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <Check size={13} className="text-emerald-600 shrink-0" />
+                      ) : !isAccessible ? (
+                        <Lock size={12} className="text-gray-300 shrink-0" />
+                      ) : (
+                        <StepIcon size={13} className="shrink-0" />
+                      )}
+                      <span>{step.name}</span>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <button 
+            onClick={() => setShowStepper(true)}
+            className="self-start bg-white border border-gray-200 shadow-sm rounded-full px-4 py-2 text-xs font-bold text-gray-600 flex items-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            <div className="w-4 h-4 rounded-full border-[2px] border-primary flex items-center justify-center shrink-0">
+              <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+            </div>
+            Show Progress: {Math.round((currentStep / 6) * 100)}%
+          </button>
+        )}
 
         {/* ================= STEP 1: OWNER DETAILS ================= */}
         {currentStep === 1 && (
@@ -723,53 +752,60 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Camera className="text-primary" size={20} />
-                  Shop Storefront Photo
+                  Shop Storefront Photos
                 </h3>
-                {shopPhoto && (
+                {shopPhotos.length > 0 && (
                   <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1">
-                    <CheckCircle2 size={13} /> Photo Captured
+                    <CheckCircle2 size={13} /> {shopPhotos.length} Photo{shopPhotos.length !== 1 ? 's' : ''} Captured
                   </span>
                 )}
               </div>
               <p className="text-xs text-gray-500 mb-4">
-                Capture a clear photo showing the front entrance and sign board of the shop.
+                Capture clear photos showing the front entrance and sign board of the shop.
               </p>
 
               {/* Photo Display / Action Box */}
-              {shopPhoto ? (
-                <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-900 group shadow-sm">
-                  <img 
-                    src={shopPhoto} 
-                    alt="Shop Front" 
-                    className="w-full h-56 md:h-64 object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <p className="font-bold text-sm">{shopName || "Shop Storefront"}</p>
-                        <p className="text-xs text-gray-300 flex items-center gap-1 mt-0.5">
-                          <MapPin size={12} className="text-primary" /> {localityName}, {cityName}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
+              {shopPhotos.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {shopPhotos.map((photo, idx) => (
+                      <div key={idx} className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group shadow-sm h-32 md:h-40">
+                        <img 
+                          src={photo} 
+                          alt={`Shop Front ${idx + 1}`} 
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
                         <button 
                           type="button"
-                          onClick={startCamera}
-                          className="px-3 py-1.5 bg-white/20 backdrop-blur-md hover:bg-white/30 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all"
-                        >
-                          <RefreshCw size={14} /> Retake
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setShopPhoto(null)}
-                          className="p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg transition-all"
+                          onClick={() => setShopPhotos(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500 text-white rounded-full transition-all cursor-pointer"
                           title="Remove Photo"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
-                    </div>
+                    ))}
+                    {shopPhotos.length < 4 && (
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="relative rounded-xl border-2 border-dashed border-gray-200 hover:border-primary/50 bg-gray-50/50 flex flex-col items-center justify-center text-center cursor-pointer transition-all h-32 md:h-40"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2">
+                          <Plus size={20} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-600">Add More</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap justify-center gap-3 w-full">
+                    <button 
+                      type="button"
+                      onClick={startCamera}
+                      className="flex-1 min-w-[130px] h-10 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <Camera size={16} /> Take Live Photo
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -777,11 +813,10 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
                     <Camera size={28} />
                   </div>
-                  <h4 className="font-bold text-gray-900 text-sm mb-1">Upload Shop Front Photo</h4>
+                  <h4 className="font-bold text-gray-900 text-sm mb-1">Upload Shop Front Photos</h4>
                   <p className="text-xs text-gray-500 max-w-sm mb-4">
-                    Use your device camera to take a live photo or select an existing photo from gallery.
+                    Use your device camera to take live photos or select existing photos from gallery.
                   </p>
-
                   <div className="flex flex-wrap justify-center gap-3 w-full max-w-xs">
                     <button 
                       type="button"
@@ -1332,7 +1367,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 <div className="w-full bg-gray-100 rounded-3xl p-2 border-4 border-gray-200 shadow-inner mb-4 relative overflow-hidden h-[300px]">
                   <div className="bg-white w-full h-full rounded-2xl overflow-y-auto no-scrollbar relative shadow-sm">
                     <div className="h-32 bg-gray-200 relative">
-                      <img src={coverPhoto || shopPhoto || ''} alt="Storefront" className="w-full h-full object-cover" />
+                      <img src={coverPhoto || (shopPhotos.length > 0 ? shopPhotos[0] : '')} alt="Storefront" className="w-full h-full object-cover" />
                       <div className="absolute -bottom-6 left-4 w-12 h-12 rounded-full border-2 border-white bg-white shadow-sm overflow-hidden p-1">
                         <img src={shopLogo || ''} alt="Logo" className="w-full h-full object-contain rounded-full" />
                       </div>
@@ -1962,23 +1997,53 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 </div>
 
                 {/* Final Confirmation Checkbox */}
-                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <div className="relative flex items-center mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={step6Confirmed}
-                        onChange={(e) => setStep6Confirmed(e.target.checked)}
-                        className="h-5 w-5 rounded-lg border-gray-300 bg-white text-primary focus:ring-primary/20 transition-all cursor-pointer appearance-none checked:border-primary checked:bg-primary"
-                      />
-                      {step6Confirmed && (
-                        <Check size={14} className="text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none stroke-[3px]" />
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-gray-700 group-hover:text-primary transition-colors leading-normal">
-                      I confirm that I have reviewed all information and the submitted details are correct. I understand false information may lead to application rejection.
-                    </span>
-                  </label>
+                <div className="space-y-3">
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={step6Confirmed}
+                          onChange={(e) => setStep6Confirmed(e.target.checked)}
+                          className="h-5 w-5 rounded-lg border-gray-300 bg-white text-primary focus:ring-primary/20 transition-all cursor-pointer appearance-none checked:border-primary checked:bg-primary"
+                        />
+                        {step6Confirmed && (
+                          <Check size={14} className="text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none stroke-[3px]" />
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-gray-700 group-hover:text-primary transition-colors leading-normal">
+                        I confirm that I have reviewed all information and the submitted details are correct. I understand false information may lead to application rejection.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Cancellation & Refund Policy Mandatory Checkbox */}
+                  <div className="bg-pink-50/60 rounded-2xl p-4 border border-pink-100">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={policyConfirmed}
+                          onChange={(e) => setPolicyConfirmed(e.target.checked)}
+                          required
+                          className="h-5 w-5 rounded-lg border-gray-300 bg-white text-primary focus:ring-primary/20 transition-all cursor-pointer appearance-none checked:border-primary checked:bg-primary"
+                        />
+                        {policyConfirmed && (
+                          <Check size={14} className="text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none stroke-[3px]" />
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-gray-800 group-hover:text-primary transition-colors leading-normal">
+                        “मैंने Cancellation & Refund Policy पढ़ ली है और मैं इससे सहमत हूँ।”{' '}
+                        <button 
+                          type="button" 
+                          onClick={() => setIsPolicyModalOpen(true)}
+                          className="text-primary font-bold underline hover:opacity-80 inline"
+                        >
+                          (Read Policy)
+                        </button>
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1987,7 +2052,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       </main>
 
       {/* Sticky Bottom Footer Bar */}
-      <div className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 py-4 z-50 shadow-2xl flex items-center justify-between gap-4">
+      <div className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50 shadow-2xl flex items-center justify-between gap-4">
         <div className="w-full max-w-3xl mx-auto flex items-center justify-between gap-4">
           <button 
             type="button"
@@ -2015,7 +2080,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
           ) : (
             <button 
               type="button"
-              disabled={!step6Confirmed}
+              disabled={!step6Confirmed || !policyConfirmed}
               onClick={() => {
                 alert(`Shop registration details for "${shopName}" submitted successfully!`);
                 if (onComplete) {
@@ -2025,7 +2090,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 }
               }}
               className={`flex-1 h-12 font-bold text-base rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg ${
-                step6Confirmed 
+                (step6Confirmed && policyConfirmed)
                   ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-98 cursor-pointer" 
                   : "bg-gray-200 text-gray-400 cursor-not-allowed opacity-60"
               }`}
@@ -2036,6 +2101,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
           )}
         </div>
       </div>
+
+      {/* Cancellation Policy Modal */}
+      <CancellationPolicyModal isOpen={isPolicyModalOpen} onClose={() => setIsPolicyModalOpen(false)} />
 
       {/* Live Camera Viewfinder Modal */}
       {isCameraOpen && (

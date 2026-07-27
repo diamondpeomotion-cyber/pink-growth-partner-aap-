@@ -81,7 +81,7 @@ export default function PayoutsScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-24 font-sans max-w-lg mx-auto shadow-lg border-x border-gray-100">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100">
       
       {/* Toast Alert */}
       {toastMessage && (
@@ -92,7 +92,7 @@ export default function PayoutsScreen({
       )}
 
       {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-lg mx-auto border-b border-gray-100">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/80 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-md mx-auto border-b border-gray-100">
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -126,7 +126,7 @@ export default function PayoutsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 pt-20 px-4 space-y-5 pb-8">
+      <main className="flex-1 w-full max-w-md mx-auto pt-20 pb-16 px-4 space-y-5">
         
         {/* Main Payout Bento Card */}
         <section className="bg-white rounded-3xl p-5 shadow-sm border border-gray-200/60 relative overflow-hidden">

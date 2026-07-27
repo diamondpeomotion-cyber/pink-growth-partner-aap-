@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSwipe } from './hooks/useSwipe';
 import { ArrowLeft } from 'lucide-react';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
@@ -7,6 +8,7 @@ import ScanQRScreen from './components/dashboard/ScanQRScreen';
 import SupportScreen from './components/dashboard/SupportScreen';
 import RewardsScreen from './components/dashboard/RewardsScreen';
 import WebsiteSettingsScreen from './components/dashboard/WebsiteSettingsScreen';
+import WebsitePreviewScreen from './components/dashboard/WebsitePreviewScreen';
 import ProfileScreen from './components/dashboard/ProfileScreen';
 import AccountSettingsScreen from './components/dashboard/AccountSettingsScreen';
 import MyShopsScreen from './components/dashboard/MyShopsScreen';
@@ -22,10 +24,40 @@ import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import NotificationsScreen from './components/dashboard/NotificationsScreen';
 
 export default function App() {
+  const swipeRef = useRef<HTMLDivElement>(null);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [history, setHistory] = useState<string[]>(['dashboard']);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setIsSyncing(true);
+      setTimeout(() => setIsSyncing(false), 2000);
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const channel = new BroadcastChannel('nexora_sync_channel');
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === 'SYNC_COMPLETE') {
+        setIsSyncing(false);
+      }
+    };
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      channel.close();
+    };
+  }, []);
 
   const navigateTo = (page: string) => {
     setHistory(prev => [...prev, page]);
@@ -43,6 +75,16 @@ export default function App() {
     }
   };
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+
+  useSwipe(swipeRef, {
+    onSwipedRight: () => {
+      if (currentPage !== 'dashboard') {
+        goBack();
+      }
+    },
+    threshold: 80,
+  });
+
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated');
@@ -67,7 +109,11 @@ export default function App() {
     }
 
     if (currentPage === 'website-settings') {
-      return <WebsiteSettingsScreen onBack={goBack} />;
+      return <WebsiteSettingsScreen onBack={goBack} onNavigate={navigateTo} />;
+    }
+
+    if (currentPage === 'website-preview') {
+      return <WebsitePreviewScreen onBack={goBack} />;
     }
 
     if (currentPage === 'account-settings') {
@@ -188,6 +234,8 @@ export default function App() {
     }
 
     return <Dashboard 
+      isOnline={isOnline}
+      isSyncing={isSyncing}
       onNavigate={navigateTo}
       onLogout={() => {
         localStorage.removeItem('isAuthenticated');
@@ -196,7 +244,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen max-h-screen w-full flex flex-col bg-[#fcf9f8] overflow-hidden">
+    <div ref={swipeRef} className="h-screen max-h-screen w-full flex flex-col bg-[#fcf9f8] overflow-hidden">
       {currentPage !== 'dashboard' && (
         <div className="fixed top-0 left-0 z-[100] p-4 pointer-events-none">
           <button 
@@ -209,7 +257,7 @@ export default function App() {
         </div>
       )}
       <div className="flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 md:pt-0">
-        <div className="min-h-full w-full">
+        <div className="min-h-full w-full max-w-md mx-auto shadow-lg border-x border-gray-100 bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
           {renderContent()}
         </div>
       </div>

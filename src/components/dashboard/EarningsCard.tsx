@@ -1,7 +1,7 @@
 import React from 'react';
 import { QrCode, CheckCircle, Clock, CalendarDays, TrendingUp, ArrowRight, Info } from 'lucide-react';
 
-export default function EarningsCard({ currentShops = 247, totalShops = 250, onNavigate }: { currentShops?: number, totalShops?: number, onNavigate?: (page: string) => void }) {
+export default function EarningsCard({ currentShops = 247, totalShops = 250, availableAmount = 8400, onNavigate }: { currentShops?: number, totalShops?: number, availableAmount?: number, onNavigate?: (page: string) => void }) {
   const progress = Math.min((currentShops / totalShops) * 100, 100);
   return (
     <div className="bg-white rounded-[18px] border border-[#e4e2e1] shadow-[0px_4px_20px_rgba(0,0,0,0.03)] overflow-hidden relative group">
@@ -15,7 +15,7 @@ export default function EarningsCard({ currentShops = 247, totalShops = 250, onN
             </div>
           </div>
           <div className="flex items-end gap-2 mt-1">
-            <p className="text-[28px] font-extrabold text-[#1b1c1b] tracking-tight">₹8,400</p>
+            <p className="text-[28px] font-extrabold text-[#1b1c1b] tracking-tight">₹{availableAmount.toLocaleString('en-IN')}</p>
             <div className="flex items-center gap-1 mb-1.5 px-2 py-0.5 bg-[#2e7d32]/10 rounded-full">
               <CheckCircle className="text-[#2e7d32]" size={14} />
               <span className="text-[11px] font-semibold text-[#2e7d32]">Verified</span>

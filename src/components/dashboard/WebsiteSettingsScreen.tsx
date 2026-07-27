@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Globe, Palette, Store, CheckCircle2, Share2, QrCode, Sparkles, Eye, Save } from 'lucide-react';
 
-export default function WebsiteSettingsScreen({ onBack }: { onBack: () => void }) {
+export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: () => void, onNavigate?: (page: string) => void }) {
   const [subdomain, setSubdomain] = useState('glowbeauty');
   const [customDomain, setCustomDomain] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('modern-salon');
@@ -15,7 +15,7 @@ export default function WebsiteSettingsScreen({ onBack }: { onBack: () => void }
   };
 
   return (
-    <div className="min-h-screen bg-[#fcf9f8] text-[#1b1c1b] pb-28">
+    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-28">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-5 md:px-10">
         <div className="flex items-center gap-3">
@@ -59,13 +59,12 @@ export default function WebsiteSettingsScreen({ onBack }: { onBack: () => void }
             <p className="text-white/80 text-xs mt-1">Share this link with your customers on WhatsApp and Instagram.</p>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <a 
-              href={`#`} 
-              onClick={(e) => { e.preventDefault(); alert(`Opening preview for https://${subdomain}.nexora.shop`); }}
+            <button 
+              onClick={() => onNavigate?.('website-preview')}
               className="flex-1 md:flex-initial bg-white text-primary px-5 py-3 rounded-xl font-bold text-sm hover:bg-pink-50 transition-colors flex items-center justify-center gap-2 shadow-md cursor-pointer"
             >
               <Eye size={16} /> Preview Store
-            </a>
+            </button>
             <button 
               onClick={() => alert(`Store link copied: https://${subdomain}.nexora.shop`)}
               className="bg-white/10 text-white hover:bg-white/20 p-3 rounded-xl transition-colors flex items-center justify-center cursor-pointer"

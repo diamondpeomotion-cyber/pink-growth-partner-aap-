@@ -174,7 +174,7 @@ export default function ProfileScreen({
   const progressPercent = hasAltPhone ? 100 : 90;
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased pt-16 pb-24 md:pb-8 min-h-screen">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased pt-16 pb-24 md:pb-8 min-h-screen overflow-x-hidden">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -247,13 +247,25 @@ export default function ProfileScreen({
                   accept="image/*" 
                   className="hidden" 
                 />
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#FDE7F3] mb-4 relative group">
+                <div 
+                  onClick={triggerPhotoSelect}
+                  className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#FDE7F3] mb-3 relative group cursor-pointer shadow-sm hover:opacity-95 transition-all"
+                  title="Click to update profile photo"
+                >
                   <img alt={profile.name} className="w-full h-full object-cover" src={profile.profileImage} />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity cursor-pointer" onClick={triggerPhotoSelect}>
-                    <Camera size={20} className="text-white mb-1" />
-                    <span className="text-[8px] text-white font-bold uppercase tracking-widest">Update</span>
+                  <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center transition-opacity">
+                    <div className="bg-primary/90 text-white p-1.5 rounded-full shadow-md">
+                      <Camera size={16} />
+                    </div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={triggerPhotoSelect}
+                  className="text-xs font-bold text-primary hover:underline mb-2 cursor-pointer flex items-center gap-1"
+                >
+                  <Camera size={12} /> Change Profile Photo
+                </button>
                 <h2 className="text-xl font-bold text-[#1b1c1b] mb-1">{profile.name}</h2>
                 <p className="text-sm text-[#5a3f47] mb-2 font-medium">Growth Partner</p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#2E7D32] text-xs font-bold mb-6">

@@ -15,9 +15,11 @@ import {
   UploadCloud,
   Zap,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react';
 import BottomNav from './BottomNav';
+import CancellationPolicyModal from '../CancellationPolicyModal';
 
 interface Ticket {
   id: string;
@@ -70,6 +72,7 @@ export default function SupportScreen({
   const [toastMessage, setToastMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -87,7 +90,7 @@ export default function SupportScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-32 font-sans">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-32 font-sans">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -177,6 +180,26 @@ export default function SupportScreen({
                       <span className="text-[10px] font-black text-[#1b1c1b] uppercase tracking-wider group-hover:text-[#b90064] transition-colors">{topic.label}</span>
                     </button>
                   ))}
+                </div>
+
+                {/* Legal & Policies Section */}
+                <div className="mt-4 pt-4 border-t border-gray-200/60">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1 mb-3">Legal & Policies</p>
+                  <button
+                    onClick={() => setIsPolicyModalOpen(true)}
+                    className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between hover:border-pink-100 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-[#b90064]">
+                        <ShieldCheck size={20} />
+                      </div>
+                      <div className="text-left">
+                        <h4 className="text-xs font-bold text-[#1b1c1b] group-hover:text-[#b90064] transition-colors">Cancellation & Refund Policy</h4>
+                        <p className="text-[11px] text-gray-500">View official platform guidelines and terms</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="text-gray-400 group-hover:text-[#b90064] transition-colors" />
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -314,6 +337,9 @@ export default function SupportScreen({
       </main>
 
       <BottomNav onNavigate={onNavigate} currentPage="support" />
+
+      {/* Cancellation Policy Modal */}
+      <CancellationPolicyModal isOpen={isPolicyModalOpen} onClose={() => setIsPolicyModalOpen(false)} />
 
     </div>
   );

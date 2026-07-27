@@ -59,7 +59,7 @@ export default function TicketDetailsScreen({
   const [inputText, setInputText] = useState('');
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-hidden font-sans">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden overflow-hidden font-sans">
       
       {/* Top Header */}
       <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm flex items-center justify-between px-5 h-16 border-b border-gray-100">
@@ -155,7 +155,7 @@ export default function TicketDetailsScreen({
       </main>
 
       {/* Input Footer */}
-      <footer className="absolute bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 px-5 py-4 pb-safe z-50">
+      <footer className="absolute bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50">
         <div className="flex items-center gap-3 max-w-xl mx-auto">
           <button className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors flex-shrink-0 active:scale-90 cursor-pointer">
             <Paperclip size={18} />

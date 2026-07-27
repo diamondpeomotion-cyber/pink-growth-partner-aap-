@@ -12,7 +12,7 @@ export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#fcf9f8] text-[#1b1c1b] pb-24">
+    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-24">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-5">
         <div className="flex items-center gap-3">

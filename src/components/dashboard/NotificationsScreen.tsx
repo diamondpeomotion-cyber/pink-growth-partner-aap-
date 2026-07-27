@@ -9,7 +9,8 @@ import {
   MessageSquare,
   Clock,
   CheckCircle2,
-  Bell
+  Bell,
+  Archive
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -58,7 +59,7 @@ const NOTIFICATIONS: Notification[] = [
 ];
 
 const FILTERS = [
-  'All', 'Shops', 'QR Qualification', 'Earnings', 'Payouts', 'Rewards', 'Support'
+  'All', 'Unread', 'Shops', 'QR Qualification', 'Earnings', 'Payouts', 'Rewards', 'Support'
 ];
 
 interface NotificationsScreenProps {
@@ -68,6 +69,11 @@ interface NotificationsScreenProps {
 
 export default function NotificationsScreen({ onBack, onNavigate }: NotificationsScreenProps) {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+
+  const handleArchive = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
 
   const getIcon = (type: Notification['type']) => {
     switch (type) {
@@ -92,7 +98,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-32 font-sans">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-32 font-sans">
       
       {/* Top Header */}
       <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100">
@@ -130,7 +136,15 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
       {/* Main Content */}
       <main className="flex-1 w-full max-w-xl mx-auto px-5 py-6 flex flex-col gap-4">
         <AnimatePresence mode="popLayout">
-          {NOTIFICATIONS.map((notif, idx) => (
+          {notifications.filter(notif => {
+            if (activeFilter === 'Unread') return notif.unread;
+            if (activeFilter === 'Shops') return notif.type === 'shop';
+            if (activeFilter === 'QR Qualification') return notif.type === 'qr';
+            if (activeFilter === 'Payouts' || activeFilter === 'Earnings') return notif.type === 'payout';
+            if (activeFilter === 'Rewards') return notif.type === 'reward';
+            if (activeFilter === 'Support') return notif.type === 'support';
+            return true;
+          }).map((notif, idx) => (
             <motion.div
               key={notif.id}
               initial={{ opacity: 0, y: 10 }}

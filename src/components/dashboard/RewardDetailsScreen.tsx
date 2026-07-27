@@ -261,10 +261,10 @@ export default function RewardDetailsScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-24 font-sans max-w-lg mx-auto shadow-lg border-x border-gray-100">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100">
       
       {/* Sticky Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-md shadow-xs h-14 flex items-center justify-between px-4 max-w-lg mx-auto border-b border-gray-100">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/85 backdrop-blur-md shadow-xs h-14 flex items-center justify-between px-4 max-w-md mx-auto border-b border-gray-100">
         <button
           onClick={onBack}
           className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-50 text-gray-700 transition-colors cursor-pointer"

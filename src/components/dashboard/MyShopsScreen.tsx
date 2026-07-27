@@ -1,7 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getItem, setItem } from '../../utils/db';
+
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
   SlidersHorizontal,
+  Archive,
   Bell,
   Star,
   CheckCircle2,
@@ -183,10 +187,45 @@ export default function MyShopsScreen({
   onBack?: () => void;
 }) {
   const [shops, setShops] = useState<Shop[]>(INITIAL_SHOPS);
+  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOfflineMode(false);
+    const handleOffline = () => setIsOfflineMode(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const loadData = async () => {
+      try {
+        const cachedShops = await getItem<Shop[]>('myshops_data');
+        if (cachedShops && cachedShops.length > 0) {
+          setShops(cachedShops);
+        } else {
+          await setItem('myshops_data', INITIAL_SHOPS);
+        }
+      } catch (err) {
+        console.error('Failed to load from IndexedDB', err);
+      }
+    };
+    loadData();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Save when shops change (e.g. if we add a shop later)
+  useEffect(() => {
+    setItem('myshops_data', shops).catch(console.error);
+  }, [shops]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [selectedSort, setSelectedSort] = useState('Newest First');
+  const handleArchive = (id: string) => {
+    setShops(prev => prev.filter(s => s.id !== id));
+  };
   const [selectedArea, setSelectedArea] = useState('');
   
   // Interactive Modal States
@@ -250,21 +289,21 @@ export default function MyShopsScreen({
 
   // Handle Bottom Sheet filters apply
   const handleApplyFilters = () => {
-    setFilterSheetOpen(false);
+    setFilterDropdownOpen(false);
   };
 
   const handleClearFilters = () => {
     setSelectedSort('Newest First');
     setSelectedArea('');
     setActiveTab('All');
-    setFilterSheetOpen(false);
+    setFilterDropdownOpen(false);
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative pb-24 font-sans">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans">
       
       {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-lg mx-auto border-b border-gray-100">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/80 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-md mx-auto border-b border-gray-100">
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -289,16 +328,6 @@ export default function MyShopsScreen({
             <Search size={18} />
           </button>
           <button 
-            aria-label="Filter panel"
-            onClick={() => setFilterSheetOpen(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 active:scale-95 transition-all relative"
-          >
-            <SlidersHorizontal size={18} />
-            {(selectedArea || selectedSort !== 'Newest First') && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full"></span>
-            )}
-          </button>
-          <button 
             aria-label="Notifications"
             onClick={() => onNavigate('notifications')}
             className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 active:scale-95 transition-all relative"
@@ -310,7 +339,7 @@ export default function MyShopsScreen({
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-lg mx-auto pt-20 pb-16 px-4">
+      <main className="flex-1 w-full max-w-md mx-auto pt-20 pb-16 px-4">
         
         {/* Title */}
         <div className="flex items-center justify-between mb-4 mt-2">
@@ -349,28 +378,94 @@ export default function MyShopsScreen({
           Only qualifying shops are counted towards rewards.
         </p>
 
-        {/* Search Field */}
-        <div className="relative mb-5">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            id="search-input"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-12 pl-11 pr-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-primary/20 font-medium text-xs text-gray-900 placeholder:text-gray-400 outline-none transition-all shadow-inner"
-            placeholder="Search shop, owner, mobile or area..."
-          />
-          {searchQuery && (
+        {/* Search & Filter Dropdown */}
+        <div className="flex gap-2 mb-5 relative">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              id="search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-12 pl-11 pr-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-primary/20 font-medium text-xs text-gray-900 placeholder:text-gray-400 outline-none transition-all shadow-inner"
+              placeholder="Search shop, owner, mobile or area..."
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-gray-200/50 p-1 rounded-full transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          
+          <div className="relative">
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-gray-200/50 p-1 rounded-full transition-colors"
+              onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+              className={`h-12 w-12 flex items-center justify-center rounded-2xl border transition-all active:scale-95 ${
+                filterDropdownOpen 
+                  ? 'bg-primary border-primary text-white shadow-md' 
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
             >
-              <X size={12} />
+              <SlidersHorizontal size={18} />
+              {(activeTab !== 'All' || selectedSort !== 'Newest First') && !filterDropdownOpen && (
+                <span className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full"></span>
+              )}
             </button>
-          )}
+            
+            {/* Dropdown Menu */}
+            {filterDropdownOpen && (
+              <div className="absolute right-0 top-14 mt-1 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                  <h3 className="font-extrabold text-sm text-gray-900">Sort & Filter</h3>
+                  <button onClick={handleClearFilters} className="text-[10px] font-bold text-primary hover:underline">Clear All</button>
+                </div>
+                
+                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Sort By</h4>
+                    <div className="flex flex-col gap-1">
+                      {['Newest First', 'Oldest First', 'Highest Earnings'].map(opt => (
+                        <button
+                          key={opt}
+                          onClick={() => { setSelectedSort(opt); setFilterDropdownOpen(false); }}
+                          className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedSort === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Status</h4>
+                    <div className="flex flex-col gap-1">
+                      {['All', 'Qualifying', 'Under Review', 'Need Changes', 'KYC Pending', 'QR Not Active', 'Daily Target Failed'].map(opt => (
+                        <button
+                          key={opt}
+                          onClick={() => { setActiveTab(opt); setFilterDropdownOpen(false); }}
+                          className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex justify-between items-center ${
+                            activeTab === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span>{opt === 'Qualifying' ? 'Active (Qualifying)' : opt === 'Under Review' ? 'Pending (Under Review)' : opt}</span>
+                          {activeTab === opt && <Check size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+        
+        {/* Horizontal Scrollable Filter Tabs (Keep for quick access, or remove if redundant, let's keep them as requested, but the dropdown now exists) */}
 
-        {/* Horizontal Scrollable Filter Tabs */}
         <div className="flex overflow-x-auto no-scrollbar gap-2 mb-6 -mx-4 px-4 snap-x">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.value;
@@ -407,7 +502,8 @@ export default function MyShopsScreen({
               </button>
             </div>
           ) : (
-            filteredShops.map((shop) => {
+            <AnimatePresence mode="popLayout">
+            {filteredShops.map((shop) => {
               // Decide border and accent coloring based on status
               let accentColor = 'bg-emerald-500';
               let borderStyle = 'border-gray-200';
@@ -440,9 +536,30 @@ export default function MyShopsScreen({
               }
 
               return (
-                <div
-                  key={shop.id}
-                  className={`bg-white rounded-3xl p-4 shadow-sm border ${borderStyle} relative overflow-hidden hover:shadow-md transition-all`}
+              <motion.div
+                key={shop.id}
+                layout
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="relative rounded-3xl"
+              >
+                {/* Archive Background */}
+                <div className="absolute inset-0 flex items-center justify-end px-6 bg-red-100 rounded-3xl">
+                   <Archive size={24} className="text-red-500" />
+                </div>
+                
+                <motion.div
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={{ left: 0.5, right: 0 }}
+                  onDragEnd={(e, { offset }) => {
+                    if (offset.x < -100) {
+                      handleArchive(shop.id);
+                    }
+                  }}
+                  className={`bg-white rounded-3xl p-4 shadow-sm border ${borderStyle} relative overflow-hidden hover:shadow-md h-full w-full`}
                 >
                   {/* Status Strip Accent */}
                   <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`}></div>
@@ -599,9 +716,11 @@ export default function MyShopsScreen({
                       </button>
                     )}
                   </div>
-                </div>
+                </motion.div>
+              </motion.div>
               );
-            })
+            })}
+            </AnimatePresence>
           )}
         </div>
       </main>
@@ -609,7 +728,7 @@ export default function MyShopsScreen({
       {/* Floating Action Button "Add Shop" */}
       <button
         onClick={() => onNavigate('add-shop')}
-        className="fixed right-5 bottom-24 bg-primary text-white rounded-2xl h-14 px-5 shadow-lg flex items-center justify-center gap-2 z-40 active:scale-95 hover:scale-102 transition-all cursor-pointer"
+        className="fixed right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] bg-primary text-white rounded-2xl h-14 px-5 shadow-lg flex items-center justify-center gap-2 z-40 active:scale-95 hover:scale-102 transition-all cursor-pointer"
       >
         <Plus size={20} className="stroke-[3px]" />
         <span className="text-xs font-extrabold tracking-tight">Add Shop</span>
@@ -617,119 +736,6 @@ export default function MyShopsScreen({
 
       {/* Bottom Navigation */}
       <BottomNav onNavigate={onNavigate} currentPage="shops" />
-
-      {/* ================= FILTER BOTTOM SHEET OVERLAY ================= */}
-      {filterSheetOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
-            onClick={() => setFilterSheetOpen(false)}
-          ></div>
-
-          {/* Sheet Content */}
-          <div className="relative w-full max-w-lg bg-white rounded-t-[24px] shadow-2xl transition-all duration-300 max-h-[85vh] flex flex-col z-10 animate-in slide-in-from-bottom">
-            {/* Handle */}
-            <div className="w-full flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1 bg-gray-200 rounded-full"></div>
-            </div>
-
-            {/* Header */}
-            <div className="flex justify-between items-center px-5 pb-3 border-b border-gray-100">
-              <h3 className="font-extrabold text-sm text-gray-900">Filter & Sort Shops</h3>
-              <button
-                onClick={() => setFilterSheetOpen(false)}
-                className="text-gray-400 p-1.5 hover:bg-gray-50 rounded-full transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 overflow-y-auto space-y-5 flex-1">
-              
-              {/* Sort By Option */}
-              <div>
-                <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider mb-2.5">Sort By</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Newest First', 'Oldest First', 'Highest Earnings'].map((sortOpt) => (
-                    <button
-                      key={sortOpt}
-                      onClick={() => setSelectedSort(sortOpt)}
-                      className={`py-2 px-3 rounded-xl border text-[11px] font-bold transition-all text-center ${
-                        selectedSort === sortOpt
-                          ? 'bg-primary/5 text-primary border-primary/30'
-                          : 'bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100/50'
-                      }`}
-                    >
-                      {sortOpt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Area Location Filter */}
-              <div>
-                <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider mb-2.5">Filter by Area</h4>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={selectedArea}
-                    onChange={(e) => setSelectedArea(e.target.value)}
-                    className="w-full h-11 pl-10 pr-4 bg-gray-50 border-none rounded-xl text-xs font-semibold placeholder:text-gray-400 focus:ring-1 focus:ring-primary/20 outline-none"
-                    placeholder="Enter area (e.g. MI Road, Mansarovar)..."
-                  />
-                  {selectedArea && (
-                    <button
-                      onClick={() => setSelectedArea('')}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Quick Select */}
-              <div>
-                <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider mb-2.5">Quick Status Filter</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {['All', 'Qualifying', '15-Day Cycle', 'Daily Target Failed', 'QR Not Active', 'Need Changes', 'Under Review'].map((statusOpt) => (
-                    <button
-                      key={statusOpt}
-                      onClick={() => setActiveTab(statusOpt)}
-                      className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
-                        activeTab === statusOpt
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                      }`}
-                    >
-                      {statusOpt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-4 border-t border-gray-100 flex gap-3 bg-white pb-6">
-              <button
-                onClick={handleClearFilters}
-                className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-600 h-11 rounded-2xl font-bold text-xs transition-colors"
-              >
-                Clear All
-              </button>
-              <button
-                onClick={handleApplyFilters}
-                className="flex-[2] bg-primary text-white h-11 rounded-2xl font-bold text-xs shadow-md shadow-pink-600/10 hover:bg-primary/95 transition-all"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ================= INTERACTIVE DETAIL MODALS ================= */}
       {activeModal && (

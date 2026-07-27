@@ -11,7 +11,7 @@ export default function BottomNav({ onNavigate, currentPage }: { onNavigate?: (p
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-white/80 backdrop-blur-md shadow-[0px_-4px_20px_rgba(0,0,0,0.03)] border-t border-gray-100 flex justify-around items-center h-20 px-2 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md mx-auto z-50 rounded-t-2xl bg-white/80 backdrop-blur-md shadow-[0px_-4px_20px_rgba(0,0,0,0.03)] border-t border-gray-100 flex justify-around items-center h-[calc(5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] px-2">
       {items.map((item, idx) => {
         const isActive = item.page === currentPage || (item.page === 'dashboard' && !currentPage);
         
