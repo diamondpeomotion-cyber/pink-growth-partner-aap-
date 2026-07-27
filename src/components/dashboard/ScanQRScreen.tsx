@@ -26,7 +26,7 @@ export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-5 pt-8 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-8 space-y-6">
         {scanning ? (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
             <div className="w-64 h-64 bg-gray-900 rounded-2xl relative overflow-hidden flex items-center justify-center shadow-inner mb-6">

@@ -94,10 +94,16 @@ export default function App() {
   }, []);
 
   if (!isLoggedIn) {
-    return <LoginForm onLoginSuccess={() => {
-      localStorage.setItem('isAuthenticated', 'true');
-      setIsLoggedIn(true);
-    }} />;
+    return (
+      <div className="min-h-screen bg-[#fcf9f8] flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <LoginForm onLoginSuccess={() => {
+            localStorage.setItem('isAuthenticated', 'true');
+            setIsLoggedIn(true);
+          }} />
+        </div>
+      </div>
+    );
   }
 
   const renderContent = () => {
@@ -257,7 +263,7 @@ export default function App() {
         </div>
       )}
       <div className="flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 md:pt-0">
-        <div className="min-h-full w-full max-w-md mx-auto shadow-lg border-x border-gray-100 bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
+        <div className="min-h-full w-full shadow-lg bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
           {renderContent()}
         </div>
       </div>

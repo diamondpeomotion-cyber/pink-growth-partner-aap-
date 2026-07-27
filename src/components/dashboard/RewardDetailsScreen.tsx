@@ -261,29 +261,31 @@ export default function RewardDetailsScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100">
       
       {/* Sticky Header */}
-      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/85 backdrop-blur-md shadow-xs h-14 flex items-center justify-between px-4 max-w-md mx-auto border-b border-gray-100">
-        <button
-          onClick={onBack}
-          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-50 text-gray-700 transition-colors cursor-pointer"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="font-extrabold text-sm text-gray-900 tracking-tight">Reward Details</h1>
-        <div className="flex items-center gap-1">
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-xs h-14">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-14">
           <button
-            onClick={() => alert(`Active Qualifying Shops: ${qualifyingCount}\nYour progress is audited and updated hourly.`)}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+            onClick={onBack}
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-50 text-gray-700 transition-colors cursor-pointer"
           >
-            <Info size={18} />
+            <ArrowLeft size={20} />
           </button>
+          <h1 className="font-extrabold text-sm text-gray-900 tracking-tight">Reward Details</h1>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => alert(`Active Qualifying Shops: ${qualifyingCount}\nYour progress is audited and updated hourly.`)}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+            >
+              <Info size={18} />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 pt-16 px-4 space-y-4">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full pt-6 px-[--page-margin] space-y-4">
         
         {/* Horizontal Reward Selector Chips */}
         <div className="flex gap-2 overflow-x-auto py-2 no-scrollbar -mx-4 px-4 shrink-0">

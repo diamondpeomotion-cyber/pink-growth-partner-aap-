@@ -51,53 +51,55 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] flex flex-col">
+    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] flex flex-col w-full shadow-lg border-x border-gray-100">
       {/* Top Navigation / Controls Bar */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-5 md:px-10 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 text-primary transition-colors cursor-pointer"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              Website Live Preview <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">Active</span>
-            </h1>
-            <p className="text-xs text-gray-500">https://{subdomain}.nexora.shop</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Device Switcher */}
-          <div className="bg-gray-100 p-1 rounded-xl hidden sm:flex items-center gap-1">
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-16">
+          <div className="flex items-center gap-3">
             <button 
-              onClick={() => setPreviewDevice('mobile')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'mobile' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              onClick={onBack}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 text-primary transition-colors cursor-pointer"
             >
-              <Smartphone size={16} /> Mobile View
+              <ArrowLeft size={20} />
             </button>
-            <button 
-              onClick={() => setPreviewDevice('desktop')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'desktop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-            >
-              <Monitor size={16} /> Desktop View
-            </button>
+            <div>
+              <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                Website Live Preview <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">Active</span>
+              </h1>
+              <p className="text-xs text-gray-500">https://{subdomain}.nexora.shop</p>
+            </div>
           </div>
 
-          <button 
-            onClick={handleShare}
-            className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <Share2 size={14} /> Share Link
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Device Switcher */}
+            <div className="bg-gray-100 p-1 rounded-xl hidden sm:flex items-center gap-1">
+              <button 
+                onClick={() => setPreviewDevice('mobile')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'mobile' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                <Smartphone size={16} /> Mobile View
+              </button>
+              <button 
+                onClick={() => setPreviewDevice('desktop')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'desktop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                <Monitor size={16} /> Desktop View
+              </button>
+            </div>
+
+            <button 
+              onClick={handleShare}
+              className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <Share2 size={14} /> Share Link
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Preview Frame Area */}
       <main className="flex-1 bg-gray-100 p-4 md:p-8 flex items-center justify-center overflow-auto">
-        <div className={`bg-white shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${previewDevice === 'mobile' ? 'w-[390px] h-[780px] rounded-[44px] border-[10px] border-gray-900' : 'w-full max-w-5xl h-[80vh] rounded-2xl border border-gray-200'}`}>
+        <div className={`bg-white shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${previewDevice === 'mobile' ? 'w-full h-[780px] rounded-[44px] border-[10px] border-gray-900' : 'w-full h-[80vh] rounded-2xl border border-gray-200'}`}>
           
           {/* Simulated Web Header */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
@@ -138,7 +140,7 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
                 <Sparkles size={30} className="text-white" />
               </div>
               <h1 className="text-2xl md:text-4xl font-extrabold mb-2 tracking-tight">Glow Beauty Parlour</h1>
-              <p className="text-xs md:text-sm text-white/90 max-w-md mb-6 leading-relaxed">
+              <p className="text-xs md:text-sm text-white/90 max-w-screen-md mb-6 leading-relaxed">
                 Expert bridal makeup, hair styling, advanced facials & luxury skin care treatments in Vaishali Nagar, Jaipur.
               </p>
               <div className="flex flex-wrap justify-center gap-3 text-xs font-medium">
@@ -223,7 +225,7 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
       {/* Customer Booking Modal with Mandatory Policy Checkbox */}
       {isBookingModalOpen && (
         <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-gray-100">
+          <div className="bg-white w-full max-w-screen-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-gray-100">
             <div className="px-6 py-4 bg-gray-900 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm">Confirm Appointment</h3>
               <button onClick={() => setIsBookingModalOpen(false)} className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300">

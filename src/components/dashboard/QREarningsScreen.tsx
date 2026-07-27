@@ -153,7 +153,7 @@ export default function QREarningsScreen({
   };
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
       
       {/* Dynamic Toast Alerts */}
       {toastMessage && (
@@ -217,35 +217,37 @@ export default function QREarningsScreen({
       )}
 
       {/* Top Header */}
-      <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full z-50 bg-white/80 backdrop-blur-md shadow-xs h-16 flex justify-between items-center px-4 max-w-md mx-auto border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-90 transition-all cursor-pointer"
-          >
-            <ArrowLeft size={20} className="stroke-[2.5px]" />
-          </button>
-          <h1 className="text-base font-black text-gray-900 tracking-tight">QR Earnings</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => triggerToast('Custom calendar filters enabled for July 2026.')}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all"
-          >
-            <Calendar size={18} />
-          </button>
-          <button
-            onClick={() => onNavigate('notifications')}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all relative"
-          >
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#b90064] rounded-full"></span>
-          </button>
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-90 transition-all cursor-pointer"
+            >
+              <ArrowLeft size={20} className="stroke-[2.5px]" />
+            </button>
+            <h1 className="text-base font-black text-gray-900 tracking-tight">QR Earnings</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => triggerToast('Custom calendar filters enabled for July 2026.')}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all"
+            >
+              <Calendar size={18} />
+            </button>
+            <button
+              onClick={() => onNavigate('notifications')}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all relative"
+            >
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#b90064] rounded-full"></span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-md mx-auto pt-20 pb-16 px-4 space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[--page-margin] space-y-5">
         
         {/* Quality Audit Notice */}
         <section className="bg-pink-50/50 border border-pink-100/80 rounded-3xl p-4 flex gap-3 items-start shadow-2xs">

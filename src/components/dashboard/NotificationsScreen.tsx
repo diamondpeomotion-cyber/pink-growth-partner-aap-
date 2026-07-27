@@ -102,7 +102,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
       
       {/* Top Header */}
       <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="flex items-center justify-between px-5 h-16 w-full max-w-xl mx-auto">
+        <div className="flex items-center justify-between px-[--page-margin] h-16 w-full max-w-screen-xl mx-auto">
           <button 
             onClick={onBack}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 transition-colors active:scale-95 text-[#b90064] cursor-pointer"
@@ -116,7 +116,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
         </div>
 
         {/* Filter Tabs */}
-        <div className="w-full max-w-xl mx-auto px-5 overflow-x-auto no-scrollbar py-3 flex gap-2.5 border-t border-gray-50">
+        <div className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-3 flex gap-2.5 border-t border-gray-50">
           {FILTERS.map((filter) => (
             <button
               key={filter}
@@ -134,7 +134,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-xl mx-auto px-5 py-6 flex flex-col gap-4">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] py-6 flex flex-col gap-4">
         <AnimatePresence mode="popLayout">
           {notifications.filter(notif => {
             if (activeFilter === 'Unread') return notif.unread;

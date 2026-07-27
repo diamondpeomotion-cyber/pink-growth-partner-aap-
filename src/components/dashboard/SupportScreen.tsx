@@ -108,7 +108,7 @@ export default function SupportScreen({
       </AnimatePresence>
 
       {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-white/75 backdrop-blur-xl shadow-sm flex justify-between items-center px-5 h-16 pt-[env(safe-area-inset-top)] border-b border-gray-100">
+      <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-xl shadow-sm flex justify-between items-center px-[--page-margin] h-16 pt-[env(safe-area-inset-top)] border-b border-gray-100">
         <button 
           onClick={onBack}
           className="w-10 h-10 flex items-center justify-center rounded-full bg-pink-50 text-[#b90064] hover:opacity-80 transition-opacity active:scale-95 cursor-pointer"
@@ -125,7 +125,7 @@ export default function SupportScreen({
         </button>
       </header>
 
-      <main className="flex-1 w-full max-w-xl mx-auto px-5 pt-20 flex flex-col gap-6">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] pt-6 flex flex-col gap-6">
         
         {/* User Context Header */}
         <div className="flex items-center gap-4 bg-white rounded-[18px] p-4 shadow-sm border border-gray-100">

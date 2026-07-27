@@ -24,6 +24,24 @@
   --color-error-container: #ffdad6;
   --color-warning: #ED6C02;
   --color-gold-vip: #C5A059;
+
+  --spacing-page-margin: 1rem;
+}
+
+@layer base {
+  :root {
+    --page-margin: 1rem;
+  }
+  @media (min-width: 640px) {
+    :root {
+      --page-margin: 1.5rem;
+    }
+  }
+  @media (min-width: 768px) {
+    :root {
+      --page-margin: 2rem;
+    }
+  }
 }
 
 body {

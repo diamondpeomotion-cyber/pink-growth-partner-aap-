@@ -389,7 +389,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
 
   return (
-    <div className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans w-full max-w-md mx-auto overflow-x-hidden relative flex flex-col">
+    <div className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans w-full overflow-x-hidden relative flex flex-col">
       {/* Toast Alert for Draft */}
       {draftSaved && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm animate-fade-in w-[90%] max-w-sm">
@@ -417,30 +417,32 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       />
 
       {/* Top App Bar */}
-      <header className="sticky top-0 w-full z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm flex items-center justify-between px-4 h-16">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => {
-              if (currentStep > 1) {
-                setCurrentStep(currentStep - 1);
-              } else {
-                onBack();
-              }
-            }} 
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all"
-            aria-label="Back"
-          >
-            <ArrowLeft size={20} className="text-gray-700" />
-          </button>
-          <div>
-            <h1 className="font-bold text-gray-900 text-lg">Add New Shop</h1>
-            <p className="text-xs text-gray-500 font-medium">Step {currentStep} of 6</p>
+      <header className="sticky top-0 w-full z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-4 sm:px-6 md:px-8 h-16">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                if (currentStep > 1) {
+                  setCurrentStep(currentStep - 1);
+                } else {
+                  onBack();
+                }
+              }} 
+              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all"
+              aria-label="Back"
+            >
+              <ArrowLeft size={20} className="text-gray-700" />
+            </button>
+            <div>
+              <h1 className="font-bold text-gray-900 text-lg">Add New Shop</h1>
+              <p className="text-xs text-gray-500 font-medium">Step {currentStep} of 6</p>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="px-4 pt-6 pb-32 flex flex-col gap-6 w-full">
+      <main className="max-w-screen-xl mx-auto w-full px-4 sm:px-6 md:px-8 pt-6 pb-32 flex flex-col gap-6">
         {/* Progress Indicator */}
         {showStepper ? (
           <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm relative transition-all">
@@ -2053,7 +2055,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
       {/* Sticky Bottom Footer Bar */}
       <div className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50 shadow-2xl flex items-center justify-between gap-4">
-        <div className="w-full max-w-3xl mx-auto flex items-center justify-between gap-4">
+        <div className="w-full max-w-screen-xl mx-auto flex items-center justify-between gap-4">
           <button 
             type="button"
             onClick={() => {

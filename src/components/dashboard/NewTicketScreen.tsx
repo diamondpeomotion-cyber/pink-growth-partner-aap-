@@ -63,7 +63,7 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-xl mx-auto px-5 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] py-6 space-y-6">
         {/* Page Header (Desktop Context) */}
         <div className="hidden md:block mb-8">
           <button 

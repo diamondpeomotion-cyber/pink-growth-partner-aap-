@@ -174,7 +174,7 @@ export default function ProfileScreen({
   const progressPercent = hasAltPhone ? 100 : 90;
 
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased pt-16 pb-24 md:pb-8 min-h-screen overflow-x-hidden">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased pb-24 min-h-screen overflow-x-hidden w-full shadow-lg border-x border-gray-100">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -192,45 +192,49 @@ export default function ProfileScreen({
       </AnimatePresence>
 
       {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-10 h-16 max-w-full bg-white/75 backdrop-blur-md shadow-[0px_4px_20px_rgba(0,0,0,0.03)] hidden md:flex">
-        <div className="font-bold text-xl text-[#b90064] tracking-tight cursor-pointer" onClick={() => onNavigate?.('dashboard')}>Nexora</div>
-        <div className="flex items-center gap-4">
-          <button aria-label="Settings" onClick={() => onNavigate?.('account-settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
-            <Settings size={20} className="text-[#5a3f47]" />
-          </button>
-          <button aria-label="Notifications" onClick={() => onNavigate?.('notifications')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors relative cursor-pointer">
-            <Bell size={20} className="text-[#5a3f47]" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#b90064] rounded-full border border-white"></span>
-          </button>
-          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 cursor-pointer" onClick={() => onNavigate?.('profile')}>
-            <img alt="Salon Owner Profile" className="w-full h-full object-cover" src={profile.profileImage || "https://lh3.googleusercontent.com/aida-public/AB6AXuAy6hBXYrmOKccJ8RjKAe7kpKClrr-9OypinMvvOA-LCNcjimH7jJbcj3DieYl_wz-RVBdcif-aDklQv8RYt45qr3Sk0pdq2P-dZ8gMvDB_EMjnyc3zJRXwFW6yvJDFjX898GvU4gXDlzJFGaij2t5iaE6hIodnoEnagr4jCr-arF0_Dsj-IEp0PusKkFAW92STh-4NU3yqtbMYNePhl4Jmq1979DzQnvLpt0U2xWQUS0B5eWRPw90S"} />
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border-b border-gray-100 hidden md:block">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+          <div className="font-bold text-xl text-[#b90064] tracking-tight cursor-pointer" onClick={() => onNavigate?.('dashboard')}>Nexora</div>
+          <div className="flex items-center gap-4">
+            <button aria-label="Settings" onClick={() => onNavigate?.('account-settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
+              <Settings size={20} className="text-[#5a3f47]" />
+            </button>
+            <button aria-label="Notifications" onClick={() => onNavigate?.('notifications')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors relative cursor-pointer">
+              <Bell size={20} className="text-[#5a3f47]" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#b90064] rounded-full border border-white"></span>
+            </button>
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 cursor-pointer" onClick={() => onNavigate?.('profile')}>
+              <img alt="Salon Owner Profile" className="w-full h-full object-cover" src={profile.profileImage || "https://lh3.googleusercontent.com/aida-public/AB6AXuAy6hBXYrmOKccJ8RjKAe7kpKClrr-9OypinMvvOA-LCNcjimH7jJbcj3DieYl_wz-RVBdcif-aDklQv8RYt45qr3Sk0pdq2P-dZ8gMvDB_EMjnyc3zJRXwFW6yvJDFjX898GvU4gXDlzJFGaij2t5iaE6hIodnoEnagr4jCr-arF0_Dsj-IEp0PusKkFAW92STh-4NU3yqtbMYNePhl4Jmq1979DzQnvLpt0U2xWQUS0B5eWRPw90S"} />
+            </div>
           </div>
         </div>
       </header>
 
       {/* Mobile Header */}
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-5 h-16 bg-white/75 backdrop-blur-md shadow-sm md:hidden border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-[#b90064] cursor-pointer"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-xl font-bold text-[#1b1c1b]">Profile</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <button aria-label="Settings" onClick={() => onNavigate?.('account-settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
-            <Settings size={20} className="text-[#5a3f47]" />
-          </button>
-          <button aria-label="Notifications" onClick={() => onNavigate?.('notifications')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors relative cursor-pointer">
-            <Bell size={20} className="text-[#5a3f47]" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#b90064] rounded-full border border-white"></span>
-          </button>
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100 md:hidden">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={onBack}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-[#b90064] cursor-pointer"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h1 className="text-xl font-bold text-[#1b1c1b]">Profile</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button aria-label="Settings" onClick={() => onNavigate?.('account-settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
+              <Settings size={20} className="text-[#5a3f47]" />
+            </button>
+            <button aria-label="Notifications" onClick={() => onNavigate?.('notifications')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors relative cursor-pointer">
+              <Bell size={20} className="text-[#5a3f47]" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#b90064] rounded-full border border-white"></span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-5 md:px-10 pt-6">
+      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column: Summary & Quick Actions */}
@@ -544,7 +548,7 @@ export default function ProfileScreen({
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl z-10 p-6 space-y-4"
+              className="relative bg-white w-full max-w-screen-md rounded-3xl overflow-hidden shadow-2xl z-10 p-6 space-y-4"
             >
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                 <h3 className="font-extrabold text-base text-gray-900 tracking-tight">Edit Partner Profile</h3>

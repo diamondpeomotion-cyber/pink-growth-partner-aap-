@@ -66,30 +66,32 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-28">
+    <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-28 w-full shadow-lg border-x border-gray-100">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-5 md:px-10">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-pink-50 text-primary transition-colors cursor-pointer"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold text-primary">Account Settings</h1>
-            <p className="text-xs text-gray-500">Manage your profile & security</p>
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-16">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={onBack}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-pink-50 text-primary transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-sm font-bold text-primary">Account Settings</h1>
+              <p className="text-[10px] text-gray-500">Manage your profile & security</p>
+            </div>
           </div>
+          <button 
+            onClick={handleSaveProfile}
+            className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-primary/90 transition-colors shadow-md flex items-center gap-2 cursor-pointer"
+          >
+            <Save size={14} /> Save
+          </button>
         </div>
-        <button 
-          onClick={handleSaveProfile}
-          className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors shadow-md flex items-center gap-2 cursor-pointer"
-        >
-          <Save size={16} /> Save Profile
-        </button>
       </header>
 
-      <main className="max-w-3xl mx-auto px-5 pt-8 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-6 space-y-6">
         {savedSuccess && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in">
             <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />

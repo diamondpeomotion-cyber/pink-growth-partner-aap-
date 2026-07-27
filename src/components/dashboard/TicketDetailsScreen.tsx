@@ -156,7 +156,7 @@ export default function TicketDetailsScreen({
 
       {/* Input Footer */}
       <footer className="absolute bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] z-50">
-        <div className="flex items-center gap-3 max-w-xl mx-auto">
+        <div className="flex items-center gap-3 max-w-screen-xl mx-auto px-[--page-margin]">
           <button className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors flex-shrink-0 active:scale-90 cursor-pointer">
             <Paperclip size={18} />
           </button>

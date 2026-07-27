@@ -41,9 +41,9 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
   }, []);
   
   return (
-    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans max-w-md mx-auto shadow-lg border-x border-gray-100 overflow-x-hidden">
+    <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
       <DashboardHeader onLogout={onLogout} onNavigate={onNavigate} isOnline={isOnline} isSyncing={isSyncing} />
-      <main className="flex-1 w-full max-w-md mx-auto pt-20 pb-16 px-4 space-y-5">
+      <main className="flex-1 w-full pt-4 pb-16 px-[--page-margin] max-w-screen-xl mx-auto space-y-5">
         {/* Partner Header - Placeholder */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
@@ -72,7 +72,7 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
         <CompletedRewards onNavigate={onNavigate} />
       </main>
       
-      <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-md mx-auto pointer-events-none flex justify-end px-5 z-40">
+      <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full pointer-events-none flex justify-end px-5 z-40 max-w-screen-xl mx-auto">
         <button 
           onClick={() => onNavigate('add-shop')}
           className="pointer-events-auto bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center">
