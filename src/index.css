@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #b90064;
+  --color-primary-container: #e6007e;
+  --color-secondary: #b80663;
+  --color-secondary-container: #fd4b96;
+  --color-surface: #fcf9f8;
+  --color-surface-bright: #fcf9f8;
+  --color-surface-dim: #dcd9d8;
+  --color-surface-container: #F0EDEC;
+  --color-surface-container-low: #f6f3f2;
+  --color-surface-container-high: #eae7e7;
+  --color-surface-container-highest: #e4e2e1;
+  --color-surface-accent: #FDE7F3;
+  --color-surface-variant: #e4e2e1;
+  --color-on-background: #1b1c1b;
+  --color-on-surface: #1b1c1b;
+  --color-on-surface-variant: #5a3f47;
+  --color-outline: #8e6f77;
+  --color-outline-variant: #e2bdc7;
+  --color-success: #2E7D32;
+  --color-error: #BA1A1A;
+  --color-error-container: #ffdad6;
+  --color-warning: #ED6C02;
+  --color-gold-vip: #C5A059;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #FCF9F8;
+  color: #1b1c1b;
+}
+
+.glass-header {
+  backdrop-filter: blur(20px);
+  background-color: rgba(255, 255, 255, 0.75);
+}
+
+.glass-footer {
+  backdrop-filter: blur(20px);
+  background-color: rgba(255, 255, 255, 0.75);
+}
+
+.card-shadow {
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.card-shadow-hover {
+  box-shadow: 0px 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
