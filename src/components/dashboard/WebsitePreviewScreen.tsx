@@ -26,13 +26,36 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [subdomain] = useState('glowbeauty');
   const [primaryColor] = useState('#b90064');
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(`https://${subdomain}.nexora.shop`);
-      alert(`Storefront link copied to clipboard: https://${subdomain}.nexora.shop`);
-    } else {
-      alert(`Storefront URL: https://${subdomain}.nexora.shop`);
+  const handleShare = async () => {
+    const url = `https://${subdomain}.nexora.shop`;
+    const shareData = {
+      title: 'Glow Beauty Parlour',
+      text: 'Visit our official online storefront for bookings and beauty services!',
+      url: url,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShareToast('Storefront link shared successfully!');
+        setTimeout(() => setShareToast(null), 3500);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+      setShareToast('Storefront link copied to clipboard!');
+      setTimeout(() => setShareToast(null), 3500);
+    } catch (e) {
+      setShareToast('Storefront link copied to clipboard!');
+      setTimeout(() => setShareToast(null), 3500);
     }
   };
 
@@ -53,48 +76,65 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] flex flex-col w-full shadow-lg border-x border-gray-100">
       {/* Top Navigation / Controls Bar */}
-      <header className="sticky top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-16">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 left-0 w-full z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-3 sm:px-6 py-2.5 min-h-[4rem] gap-2 overflow-hidden">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <button 
               onClick={onBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 text-primary transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 text-primary transition-colors cursor-pointer shrink-0"
+              title="Go Back"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
-            <div>
-              <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                Website Live Preview <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">Active</span>
-              </h1>
-              <p className="text-xs text-gray-500">https://{subdomain}.nexora.shop</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                <h1 className="text-xs sm:text-sm md:text-base font-bold text-gray-900 truncate">
+                  Website Live Preview
+                </h1>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-extrabold shrink-0">
+                  Active
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-gray-500 font-mono truncate mt-0.5 max-w-full" title={`https://${subdomain}.nexora.shop`}>
+                https://{subdomain}.nexora.shop
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Device Switcher */}
             <div className="bg-gray-100 p-1 rounded-xl hidden sm:flex items-center gap-1">
               <button 
                 onClick={() => setPreviewDevice('mobile')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'mobile' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'mobile' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                <Smartphone size={16} /> Mobile View
+                <Smartphone size={15} /> <span className="hidden md:inline">Mobile View</span><span className="md:hidden">Mobile</span>
               </button>
               <button 
                 onClick={() => setPreviewDevice('desktop')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'desktop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${previewDevice === 'desktop' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                <Monitor size={16} /> Desktop View
+                <Monitor size={15} /> <span className="hidden md:inline">Desktop View</span><span className="md:hidden">Desktop</span>
               </button>
             </div>
 
             <button 
               onClick={handleShare}
-              className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="bg-primary text-white px-3 sm:px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 hover:scale-105 active:scale-95"
             >
-              <Share2 size={14} /> Share Link
+              <Share2 size={14} /> <span>Share Link</span>
             </button>
           </div>
         </div>
+
+        {shareToast && (
+          <div className="bg-emerald-50 border-t border-b border-emerald-200 text-emerald-900 px-4 py-2 text-xs font-bold flex items-center justify-between animate-fade-in">
+            <div className="flex items-center gap-2 max-w-screen-xl mx-auto w-full">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>{shareToast}</span>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Preview Frame Area */}

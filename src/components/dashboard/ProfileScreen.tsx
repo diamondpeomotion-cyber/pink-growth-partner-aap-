@@ -26,7 +26,12 @@ import {
   Smartphone,
   Share2,
   QrCode,
-  Camera
+  Camera,
+  ExternalLink,
+  CheckCircle2,
+  RotateCw,
+  Layers,
+  Eye
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -87,6 +92,9 @@ export default function ProfileScreen({
   // Keep track of active modals
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isIdOpen, setIsIdOpen] = useState(false);
+  const [idCardFormat, setIdCardFormat] = useState<'atm' | 'badge'>('atm');
+  const [idCardSide, setIdCardSide] = useState<'front' | 'back'>('front');
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
   const [isPauseOpen, setIsPauseOpen] = useState(false);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
@@ -638,110 +646,459 @@ export default function ProfileScreen({
         )}
       </AnimatePresence>
 
-      {/* 2. DIGITAL PARTNER ID CARD MODAL */}
+      {/* 2. DIGITAL PARTNER ID CARD MODAL (ATM CARD SIZE & LIVE PREVIEW) */}
       <AnimatePresence>
         {isIdOpen && (
+          <div className="fixed inset-0 z-110 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/75 backdrop-blur-md"
+              onClick={() => setIsIdOpen(false)}
+            ></motion.div>
+
+            <div className="relative z-10 flex flex-col items-center gap-4 w-full max-w-lg my-auto py-6">
+              
+              {/* Modal Controls Bar */}
+              <div className="w-full bg-white/10 backdrop-blur-lg border border-white/20 p-2 rounded-2xl flex items-center justify-between gap-2 shadow-xl">
+                {/* Format Toggle: ATM Card vs Vertical Badge */}
+                <div className="flex bg-black/40 p-1 rounded-xl text-xs font-bold text-white/80">
+                  <button
+                    type="button"
+                    onClick={() => setIdCardFormat('atm')}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                      idCardFormat === 'atm' ? 'bg-[#b90064] text-white shadow-md' : 'hover:text-white'
+                    }`}
+                  >
+                    <CreditCard size={14} /> ATM Card Size
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdCardFormat('badge')}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+                      idCardFormat === 'badge' ? 'bg-[#b90064] text-white shadow-md' : 'hover:text-white'
+                    }`}
+                  >
+                    <User size={14} /> Vertical Badge
+                  </button>
+                </div>
+
+                {/* Flip Side Toggle */}
+                {idCardFormat === 'atm' && (
+                  <button
+                    type="button"
+                    onClick={() => setIdCardSide(idCardSide === 'front' ? 'back' : 'front')}
+                    className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    title="Flip Card Front/Back"
+                  >
+                    <RotateCw size={14} />
+                    <span>{idCardSide === 'front' ? 'Show Back' : 'Show Front'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsIdOpen(false)}
+                  className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title="Close Preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* CARD CONTAINER */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full flex flex-col items-center"
+              >
+                {/* 1. ATM CARD FORMAT (LANDSCAPE CR80 SPECIFICATION) */}
+                {idCardFormat === 'atm' ? (
+                  <div className="w-full max-w-[440px] aspect-[1.586/1] rounded-[22px] p-4 sm:p-5 relative overflow-hidden shadow-[0px_25px_60px_rgba(0,0,0,0.5)] border-2 border-amber-300/40 text-white transition-all flex flex-col justify-between bg-gradient-to-br from-[#3b001d] via-[#a30058] to-[#1a000d]">
+                    
+                    {/* Metallic Holographic Overlay Lines */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_50%)] pointer-events-none"></div>
+                    <div className="absolute -right-20 -bottom-20 w-64 h-64 rounded-full bg-amber-400/10 blur-2xl pointer-events-none"></div>
+
+                    {/* FRONT SIDE */}
+                    {idCardSide === 'front' ? (
+                      <>
+                        {/* Top Bar: Company Logo & EMV Chip */}
+                        <div className="flex items-start justify-between z-10">
+                          {/* Company Logo & Subtitle */}
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-300 via-amber-100 to-yellow-400 text-[#a30058] p-1.5 shadow-md flex items-center justify-center font-black shrink-0 border border-amber-200">
+                              <Sparkles size={20} className="fill-current" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-base font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-amber-100">
+                                  NEXORA
+                                </span>
+                                <span className="bg-amber-300/20 text-amber-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-amber-300/30 uppercase tracking-wider">
+                                  OFFICIAL
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-amber-100/80 font-medium tracking-tight">GROWTH NETWORK PARTNER CARD</p>
+                            </div>
+                          </div>
+
+                          {/* EMV Contact Chip & Contactless Symbol */}
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-8 rounded-lg bg-gradient-to-br from-amber-200 via-yellow-400 to-amber-600 border border-amber-300/90 shadow-inner flex flex-col justify-between p-1 relative overflow-hidden">
+                              <div className="w-full h-0.5 bg-amber-800/40"></div>
+                              <div className="w-full h-0.5 bg-amber-800/40"></div>
+                              <div className="w-full h-0.5 bg-amber-800/40"></div>
+                            </div>
+                            <div className="text-amber-200/80 hidden sm:block">
+                              <Shield size={16} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Middle Content: Profile Photo + Fetched Data */}
+                        <div className="flex items-center gap-3.5 my-auto z-10 pt-1">
+                          {/* Profile Photo */}
+                          <div className="w-20 h-24 sm:w-22 sm:h-26 rounded-xl border-2 border-amber-300/80 shadow-lg overflow-hidden bg-white shrink-0 p-0.5 relative group">
+                            <img
+                              alt={profile.name}
+                              src={profile.profileImage || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop"}
+                              className="w-full h-full object-cover object-center rounded-lg"
+                            />
+                            <div className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] font-extrabold text-white text-center py-0.5 uppercase tracking-wider">
+                              VERIFIED
+                            </div>
+                          </div>
+
+                          {/* Fetched Details */}
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div>
+                              <span className="text-[9px] text-amber-200/70 uppercase tracking-wider font-extrabold block">
+                                Partner Name
+                              </span>
+                              <h3 className="text-sm sm:text-base font-black text-white truncate tracking-tight">
+                                {profile.name}
+                              </h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px]">
+                              <div>
+                                <span className="text-[9px] text-amber-200/70 uppercase tracking-wider font-semibold block">
+                                  Email
+                                </span>
+                                <span className="text-white/95 font-medium truncate block text-[10px]" title={profile.email}>
+                                  {profile.email}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-amber-200/70 uppercase tracking-wider font-semibold block">
+                                  Mobile
+                                </span>
+                                <span className="text-white/95 font-medium block text-[10px]">
+                                  {profile.mobile || '+91 98321 45678'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-0.5 text-[10px] text-amber-100/90 font-medium">
+                              <span className="bg-white/10 px-1.5 py-0.5 rounded border border-white/10">Growth Partner</span>
+                              <span>•</span>
+                              <span className="truncate">Jaipur District</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row: Embossed Card Number & Member Details */}
+                        <div className="flex items-end justify-between border-t border-amber-300/20 pt-1.5 z-10">
+                          <div>
+                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold">
+                              Partner ID / Smart Card No.
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm font-black tracking-widest text-amber-200 drop-shadow-sm">
+                              GP-JPR-1024
+                            </span>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold">
+                              Member Since
+                            </span>
+                            <span className="text-[10px] sm:text-[11px] font-bold text-white">
+                              15 Jan 2026
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      /* BACK SIDE OF ATM CARD */
+                      <div className="flex flex-col justify-between h-full text-white z-10 -mx-4 -my-4 sm:-mx-5 sm:-my-5 p-4 sm:p-5 bg-gradient-to-br from-[#250013] via-[#4d002a] to-[#120008]">
+                        {/* Magnetic Stripe */}
+                        <div className="w-[calc(100%+2rem)] sm:w-[calc(100%+2.5rem)] -mx-4 sm:-mx-5 h-9 sm:h-10 bg-gradient-to-r from-black via-gray-900 to-black border-y border-amber-500/20 my-1 flex items-center justify-end px-4">
+                          <span className="text-[9px] font-mono text-gray-400">NEXORA SECURITY MAG-STRIPE</span>
+                        </div>
+
+                        {/* Signature Bar & Security Seal */}
+                        <div className="space-y-2 my-auto">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-white/90 h-8 sm:h-9 rounded-lg px-3 flex items-center justify-between text-gray-800 font-serif italic text-xs sm:text-sm border border-gray-300 shadow-inner">
+                              <span className="select-none font-semibold text-gray-700">{profile.name}</span>
+                              <span className="text-[10px] font-mono not-italic text-gray-500 font-bold">AUTH SIGN</span>
+                            </div>
+                            <div className="bg-amber-200 text-[#6b003a] px-2.5 py-1.5 sm:py-2 rounded-lg font-mono font-black text-xs shadow-md border border-amber-300">
+                              CVV: 1024
+                            </div>
+                          </div>
+
+                          <div className="bg-white/5 p-2 rounded-xl border border-white/10 text-[10px] space-y-1 text-white/80">
+                            <div className="flex justify-between items-center text-[#ffc2e2]">
+                              <span className="font-bold">Official Email:</span>
+                              <span className="font-mono truncate">{profile.email}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span>Company Website:</span>
+                              <span className="font-mono text-amber-200">https://nexora.shop</span>
+                            </div>
+                            <div className="text-[9px] text-gray-300 pt-1 border-t border-white/10 text-center">
+                              Property of Nexora Growth Network. Official non-transferable smart card.
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer Logo & Verification Disclaimer */}
+                        <div className="flex items-center justify-between text-[9px] text-amber-200/70 border-t border-white/10 pt-1.5">
+                          <span>NEXORA NETWORK PVT LTD</span>
+                          <span className="font-mono">PARTNER ID: GP-JPR-1024</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* 2. VERTICAL BADGE FORMAT */
+                  <div className="w-full max-w-[340px] bg-white rounded-[24px] flex flex-col overflow-hidden border border-gray-200 shadow-2xl">
+                    {/* Card Header */}
+                    <div className="bg-[#FDE7F3] pt-7 pb-12 px-6 flex flex-col items-center justify-center text-center border-b border-gray-100/30 relative">
+                      <div className="flex items-center gap-2 text-[#b90064] mb-1">
+                        <Sparkles size={22} className="fill-current" />
+                        <span className="text-2xl font-black tracking-tight">Nexora</span>
+                      </div>
+                      <span className="text-[11px] text-[#5a3f47] font-semibold uppercase tracking-wider">Growth Partner ID</span>
+                    </div>
+
+                    {/* Card Body - Profile */}
+                    <div className="p-6 pt-0 flex flex-col items-center relative">
+                      {/* Avatar */}
+                      <div className="w-28 h-28 rounded-full border-4 border-white shadow-md -mt-14 overflow-hidden relative z-10 mb-3 bg-white p-0.5 flex items-center justify-center shrink-0">
+                        <img 
+                          alt={profile.name + " Photo"} 
+                          className="w-full h-full object-cover object-center rounded-full" 
+                          src={profile.profileImage || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop"} 
+                        />
+                      </div>
+
+                      {/* Name & Status */}
+                      <h2 className="text-xl font-bold text-[#1b1c1b] mb-1 text-center">{profile.name}</h2>
+                      <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 mb-4">
+                        <CheckCircle size={14} className="text-emerald-600 fill-emerald-600/10" />
+                        <span className="text-xs text-emerald-600 font-bold">Verified Partner</span>
+                      </div>
+
+                      {/* Centrally Aligned Details Grid */}
+                      <div className="w-full space-y-2.5 text-center mb-1 border-t border-gray-100 pt-4 text-xs">
+                        <div className="flex justify-between py-1 border-b border-gray-100">
+                          <span className="text-gray-500 font-medium">Partner ID</span>
+                          <span className="font-mono font-extrabold text-[#1b1c1b]">GP-JPR-1024</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-100">
+                          <span className="text-gray-500 font-medium">Email</span>
+                          <span className="font-bold text-[#1b1c1b] truncate max-w-[180px]">{profile.email}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-100">
+                          <span className="text-gray-500 font-medium">Mobile</span>
+                          <span className="font-bold text-[#1b1c1b]">{profile.mobile || '+91 98321 45678'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-100">
+                          <span className="text-gray-500 font-medium">Role</span>
+                          <span className="font-bold text-[#1b1c1b]">Growth Partner</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-gray-100">
+                          <span className="text-gray-500 font-medium">Territory</span>
+                          <span className="font-bold text-[#1b1c1b]">Jaipur District</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-gray-500 font-medium">Member Since</span>
+                          <span className="font-bold text-[#1b1c1b]">15 Jan 2026</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer Action Bar */}
+                <div className="w-full max-w-[440px] mt-4 bg-white rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl border border-gray-100">
+                  <div className="flex items-center justify-between text-xs text-gray-500 px-1 font-medium">
+                    <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      Live Profile Data Synced
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setIsIdOpen(false);
+                        setEditName(profile.name);
+                        setEditDob(profile.dob);
+                        setEditMobile(profile.mobile);
+                        setEditEmail(profile.email);
+                        setEditAddress(profile.address);
+                        setIsEditOpen(true);
+                      }}
+                      className="text-primary hover:underline font-bold cursor-pointer"
+                    >
+                      Edit Profile Info
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => triggerToast('Digital ATM ID Card downloaded as high-res PNG image.')}
+                      className="flex-1 h-12 rounded-xl bg-[#b90064] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#b90064]/90 transition-all cursor-pointer shadow-sm active:scale-98"
+                    >
+                      <Download size={16} />
+                      Download Card
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        const shareUrl = `https://glowbeauty.nexora.shop/verify/GP-JPR-1024?name=${encodeURIComponent(profile.name)}&email=${encodeURIComponent(profile.email)}`;
+                        if (navigator.share) {
+                          try {
+                            await navigator.share({
+                              title: `${profile.name} - Nexora Growth Partner ATM Card`,
+                              text: `Verified Nexora Growth Partner ID: GP-JPR-1024 (${profile.name}) - ${profile.email}`,
+                              url: shareUrl,
+                            });
+                            triggerToast('Digital ID card shared successfully!');
+                            return;
+                          } catch (e: any) {
+                            if (e.name === 'AbortError') return;
+                          }
+                        }
+                        try {
+                          await navigator.clipboard.writeText(shareUrl);
+                          triggerToast('Partner Card verification link copied to clipboard!');
+                        } catch (err) {
+                          triggerToast('Partner ID: GP-JPR-1024');
+                        }
+                      }}
+                      className="flex-1 h-12 rounded-xl bg-[#FDE7F3] text-[#b90064] text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FDE7F3]/80 transition-all cursor-pointer active:scale-98"
+                    >
+                      <Share2 size={16} />
+                      Share Card
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. PARTNER VERIFICATION PAYLOAD MODAL */}
+      <AnimatePresence>
+        {isVerifyModalOpen && (
           <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#fcf9f8]/75 backdrop-blur-md"
-              onClick={() => setIsIdOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              onClick={() => setIsVerifyModalOpen(false)}
             ></motion.div>
 
-            <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-[340px]">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                className="bg-white w-full rounded-[18px] flex flex-col overflow-hidden border border-gray-200 shadow-[0px_12px_48px_rgba(0,0,0,0.12)]"
-              >
-                {/* Card Header */}
-                <div className="bg-[#FDE7F3] p-6 flex flex-col items-center justify-center text-center border-b border-gray-100/30">
-                  <span className="text-2xl text-[#b90064] font-bold tracking-tight mb-1">Nexora</span>
-                  <span className="text-[11px] text-[#5a3f47] font-semibold uppercase tracking-wider">Growth Partner ID</span>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl relative z-10 border border-gray-100"
+            >
+              <div className="bg-gradient-to-r from-[#b90064] to-pink-700 p-6 text-white text-center relative">
+                <button 
+                  onClick={() => setIsVerifyModalOpen(false)}
+                  className="absolute top-4 right-4 text-white/80 hover:text-white p-1 rounded-full bg-black/10 hover:bg-black/20 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-3 border border-white/30">
+                  <CheckCircle2 size={28} className="text-emerald-300" />
                 </div>
+                <h3 className="text-lg font-extrabold tracking-tight">Authenticity Verification</h3>
+                <p className="text-xs text-white/80 mt-1">Official Nexora Growth Network Ledger</p>
+              </div>
 
-                {/* Card Body - Profile */}
-                <div className="p-6 flex flex-col items-center relative">
-                  {/* Avatar */}
-                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-md -mt-16 overflow-hidden relative z-10 mb-4 bg-gray-100">
-                    <img 
-                      alt={profile.name + " Photo"} 
-                      className="w-full h-full object-cover" 
-                      src={profile.profileImage} 
-                    />
+              <div className="p-6 space-y-4">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <Shield size={20} />
                   </div>
-
-                  {/* Name & Status */}
-                  <h2 className="text-xl font-bold text-[#1b1c1b] mb-2 text-center">{profile.name}</h2>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 mb-6">
-                    <CheckCircle size={16} className="text-emerald-600 fill-emerald-600/10" />
-                    <span className="text-xs text-emerald-600 font-bold">Verified</span>
-                  </div>
-
-                  {/* Details Grid */}
-                  <div className="w-full grid grid-cols-2 gap-y-4 gap-x-2 text-left mb-6 border-t border-gray-100 pt-4">
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-[#5a3f47] font-semibold mb-1">Partner ID</span>
-                      <span className="text-sm text-[#1b1c1b] font-bold">GP-JPR-1024</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-[#5a3f47] font-semibold mb-1">Role</span>
-                      <span className="text-sm text-[#1b1c1b] font-bold">Growth Partner</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-[#5a3f47] font-semibold mb-1">Territory</span>
-                      <span className="text-sm text-[#1b1c1b] font-bold">Jaipur District</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-[#5a3f47] font-semibold mb-1">Member Since</span>
-                      <span className="text-sm text-[#1b1c1b] font-bold">15 Jan 2026</span>
-                    </div>
-                  </div>
-
-                  {/* QR Code Section */}
-                  <div className="w-full flex flex-col items-center border-t border-gray-100 pt-5">
-                    <div className="w-24 h-24 bg-gray-50 rounded-lg p-2 border border-gray-200 flex items-center justify-center relative overflow-hidden">
-                      <QrCode size={48} className="text-[#b90064] opacity-40" />
-                      <div className="absolute inset-0 border-2 border-[#b90064]/10 rounded-lg"></div>
-                    </div>
-                    <span className="text-[11px] text-[#5a3f47] font-semibold mt-3 text-center">Scan to verify authenticity</span>
+                  <div>
+                    <span className="text-xs font-extrabold text-emerald-900 block">Status: Verified &amp; Active</span>
+                    <span className="text-[11px] text-emerald-700">Official Partner Credential Match</span>
                   </div>
                 </div>
 
-                {/* Card Footer Actions */}
-                <div className="p-4 bg-gray-50 flex flex-col gap-3 rounded-b-[18px]">
-                  <button 
-                    onClick={() => triggerToast('Digital ID card downloaded successfully.')}
-                    className="w-full h-[56px] rounded-[16px] bg-[#b90064] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#b90064]/90 transition-colors active:scale-[0.98] cursor-pointer"
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Partner ID</span>
+                    <span className="font-mono font-bold text-gray-900">GP-JPR-1024</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Partner Name</span>
+                    <span className="font-bold text-gray-900">{profile.name}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Designation</span>
+                    <span className="font-semibold text-gray-900">Growth Partner</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Territory</span>
+                    <span className="font-semibold text-gray-900">Jaipur District</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Mobile Number</span>
+                    <span className="font-bold text-gray-900">{profile.mobile || '+91 98321 45678'}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium">Encoded Payload</span>
+                    <span className="font-mono text-[10px] text-primary truncate max-w-[180px]">
+                      https://glowbeauty.nexora.shop/verify/GP-JPR-1024
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    onClick={async () => {
+                      const url = `https://glowbeauty.nexora.shop/verify/GP-JPR-1024?name=${encodeURIComponent(profile.name)}`;
+                      if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(url);
+                        triggerToast('Verification payload URL copied to clipboard!');
+                      }
+                    }}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <Download size={20} />
-                    Download ID Card
+                    Copy Link
                   </button>
-                  <button 
-                    onClick={() => triggerToast('Sharing ID card...')}
-                    className="w-full h-[56px] rounded-[16px] bg-[#FDE7F3] text-[#b90064] text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FDE7F3]/80 transition-colors active:scale-[0.98] cursor-pointer"
+                  <button
+                    onClick={() => setIsVerifyModalOpen(false)}
+                    className="flex-1 bg-primary hover:bg-primary/90 text-white py-3 rounded-xl font-bold text-xs transition-colors shadow-md cursor-pointer"
                   >
-                    <Share2 size={20} />
-                    Share ID Card
+                    Close
                   </button>
                 </div>
-              </motion.div>
-
-              {/* Global Close Button */}
-              <motion.button 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                aria-label="Close Digital ID" 
-                onClick={() => setIsIdOpen(false)}
-                className="w-14 h-14 rounded-full bg-white border border-gray-200 shadow-[0px_4px_20px_rgba(0,0,0,0.06)] flex items-center justify-center text-[#1b1c1b] hover:bg-gray-50 transition-colors active:scale-95 cursor-pointer"
-              >
-                <X size={28} />
-              </motion.button>
-            </div>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

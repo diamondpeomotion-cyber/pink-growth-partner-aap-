@@ -32,10 +32,13 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('********');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('Nexora@2026');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   
   const [notifPreferences, setNotifPreferences] = useState({
     email: true,
@@ -52,13 +55,20 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
   };
 
   const handleUpdatePassword = () => {
-    if (newPassword && newPassword === confirmPassword) {
-      alert('Password updated successfully!');
-      setNewPassword('');
-      setConfirmPassword('');
-    } else if (newPassword !== confirmPassword) {
-      alert('Passwords do not match');
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      setPasswordMsg({ text: 'New password must be at least 6 characters long.', type: 'error' });
+      return;
     }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ text: 'New Password and Confirm New Password do not match!', type: 'error' });
+      return;
+    }
+    setCurrentPassword(newPassword);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordMsg({ text: 'Password updated successfully!', type: 'success' });
+    setTimeout(() => setPasswordMsg(null), 4000);
   };
 
   const toggleNotif = (key: keyof typeof notifPreferences) => {
@@ -158,55 +168,102 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
             <div className="p-2 bg-blue-50 rounded-lg">
               <Lock size={20} className="text-blue-600" />
             </div>
-            <h3 className="font-bold text-gray-900">Security & Password</h3>
+            <div>
+              <h3 className="font-bold text-gray-900">Security & Password</h3>
+              <p className="text-xs text-gray-500">Manage and update your login password</p>
+            </div>
           </div>
 
+          {passwordMsg && (
+            <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+              passwordMsg.type === 'success' 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}>
+              {passwordMsg.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <Lock size={16} className="text-rose-600 shrink-0" />}
+              <span>{passwordMsg.text}</span>
+            </div>
+          )}
+
           <div className="space-y-4">
-            <div className="relative">
-              <label className="text-xs font-semibold text-gray-500 ml-1 block mb-1.5">Current Password</label>
+            {/* Current Password */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 ml-1 block mb-1.5">Current Password</label>
               <div className="relative">
                 <input 
-                  type={showPassword ? "text" : "password"} 
+                  type={showCurrentPassword ? "text" : "password"} 
                   value={currentPassword}
-                  readOnly
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed"
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm text-gray-800 font-medium focus:outline-none focus:border-blue-500 transition-colors"
                 />
                 <button 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-200/50 transition-colors cursor-pointer"
+                  title={showCurrentPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
+            {/* New Password & Confirm Password Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 ml-1">New Password</label>
-                <input 
-                  type="password" 
-                  placeholder="At least 8 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
-                />
+              {/* New Password */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 ml-1 block mb-1.5">New Password</label>
+                <div className="relative">
+                  <input 
+                    type={showNewPassword ? "text" : "password"} 
+                    placeholder="At least 8 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm text-gray-800 font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                    title={showNewPassword ? "Hide password" : "Show password"}
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 ml-1">Confirm New Password</label>
-                <input 
-                  type="password" 
-                  placeholder="Repeat new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
-                />
+
+              {/* Confirm New Password */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 ml-1 block mb-1.5">Confirm New Password</label>
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    placeholder="Repeat new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm text-gray-800 font-medium focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                    title={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
             </div>
 
             <button 
+              type="button"
               onClick={handleUpdatePassword}
-              disabled={!newPassword}
-              className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${newPassword ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+              disabled={!newPassword || !confirmPassword}
+              className={`w-full py-3 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                newPassword && confirmPassword 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-[0.99]' 
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
             >
               Update Password
             </button>

@@ -12,56 +12,120 @@ import {
   Bell,
   Archive,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert,
+  CreditCard,
+  Headphones,
+  SlidersHorizontal,
+  Search,
+  Check,
+  Trash2,
+  Sparkles,
+  Inbox
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
-interface Notification {
+export type NotificationCategory = 'All' | 'Payments' | 'Support' | 'System';
+
+export interface NotificationItem {
   id: string;
   title: string;
+  message: string;
   time: string;
   unread: boolean;
-  type: 'qr' | 'shop' | 'payout' | 'reward' | 'support';
+  category: 'Payments' | 'Support' | 'System';
+  type: 'qr' | 'shop' | 'payout' | 'payment' | 'reward' | 'support' | 'system';
   buttonLabel: string;
 }
 
-const NOTIFICATIONS: Notification[] = [
+const INITIAL_NOTIFICATIONS: NotificationItem[] = [
   {
     id: 'n1',
     title: 'Glow Beauty Parlour completed Day 9 QR target',
+    message: 'Achieved 15 valid scans today. Bonus tier progress +5%.',
     time: '2h ago',
     unread: true,
+    category: 'System',
     type: 'qr',
     buttonLabel: 'View Shop'
   },
   {
     id: 'n2',
-    title: 'Royal Cut Salon missed today’s ₹1,000 target',
-    time: '4h ago',
+    title: '₹7,850 Payout credited to HDFC Bank',
+    message: 'Bank Ref #UPI98342110. Weekly merchant settlement complete.',
+    time: '3h ago',
+    unread: true,
+    category: 'Payments',
+    type: 'payout',
+    buttonLabel: 'View Receipt'
+  },
+  {
+    id: 'n3',
+    title: 'Support Ticket #4082 Resolved',
+    message: 'Merchant QR display stand replacement dispatched via BlueDart courier.',
+    time: '5h ago',
     unread: false,
+    category: 'Support',
+    type: 'support',
+    buttonLabel: 'View Ticket'
+  },
+  {
+    id: 'n4',
+    title: 'Royal Cut Salon missed today’s ₹1,000 target',
+    message: 'Total volume reached ₹650. Nudge owner to showcase counter QR.',
+    time: '6h ago',
+    unread: false,
+    category: 'System',
     type: 'shop',
     buttonLabel: 'View Shop'
   },
   {
-    id: 'n3',
-    title: '₹7,850 payout completed',
-    time: 'Yesterday',
-    unread: false,
-    type: 'payout',
-    buttonLabel: 'View Payout'
+    id: 'n5',
+    title: '₹1,200 Onboarding Commission Received',
+    message: 'Successfully verified 3 new beauty salons in Sector 18.',
+    time: '1d ago',
+    unread: true,
+    category: 'Payments',
+    type: 'payment',
+    buttonLabel: 'View Earnings'
   },
   {
-    id: 'n4',
-    title: 'Electric Scooter progress reached 247 shops',
-    time: 'Yesterday',
-    unread: true,
+    id: 'n6',
+    title: 'Merchant Assistance Request: Soundbox Speaker',
+    message: 'Unique Unisex Salon requested urgent technician help for audio alert speaker.',
+    time: '1d ago',
+    unread: false,
+    category: 'Support',
+    type: 'support',
+    buttonLabel: 'Contact Salon'
+  },
+  {
+    id: 'n7',
+    title: 'Electric Scooter Target: 247/300 Shops Onboarded',
+    message: 'You are 53 active shops away from claiming the quarterly mega reward.',
+    time: '2d ago',
+    unread: false,
+    category: 'System',
     type: 'reward',
-    buttonLabel: 'View Reward'
+    buttonLabel: 'View Progress'
+  },
+  {
+    id: 'n8',
+    title: 'Scheduled System Maintenance Notice',
+    message: 'Core database optimization planned for Sunday 2:00 AM - 4:00 AM IST.',
+    time: '3d ago',
+    unread: false,
+    category: 'System',
+    type: 'system',
+    buttonLabel: 'Details'
   }
 ];
 
-const FILTERS = [
-  'All', 'Unread', 'Shops', 'QR Qualification', 'Earnings', 'Payouts', 'Rewards', 'Support'
+const CATEGORY_TABS: { id: NotificationCategory; label: string; icon: React.ElementType }[] = [
+  { id: 'All', label: 'All Alerts', icon: Bell },
+  { id: 'Payments', label: 'Payments', icon: CreditCard },
+  { id: 'Support', label: 'Support', icon: Headphones },
+  { id: 'System', label: 'System', icon: ShieldAlert }
 ];
 
 interface NotificationsScreenProps {
@@ -70,11 +134,14 @@ interface NotificationsScreenProps {
 }
 
 export default function NotificationsScreen({ onBack, onNavigate }: NotificationsScreenProps) {
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [activeTab, setActiveTab] = useState<NotificationCategory>('All');
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
+  const [showRightArrow, setShowRightArrow] = useState(false);
 
   const handleScroll = () => {
     if (scrollRef.current) {
@@ -107,56 +174,140 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
     }
   };
 
+  const handleMarkAllRead = () => {
+    setNotifications(prev =>
+      prev.map(n => {
+        if (activeTab === 'All' || n.category === activeTab) {
+          return { ...n, unread: false };
+        }
+        return n;
+      })
+    );
+  };
+
+  const handleToggleRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, unread: !n.unread } : n))
+    );
+  };
+
   const handleArchive = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  const getIcon = (type: Notification['type']) => {
+  const getIcon = (type: NotificationItem['type']) => {
     switch (type) {
       case 'qr': return <QrCode size={18} />;
       case 'shop': return <Store size={18} />;
-      case 'payout': return <Wallet size={18} />;
+      case 'payout':
+      case 'payment': return <Wallet size={18} />;
       case 'reward': return <Gift size={18} />;
       case 'support': return <MessageSquare size={18} />;
+      case 'system': return <ShieldAlert size={18} />;
       default: return <Bell size={18} />;
     }
   };
 
-  const getIconBg = (type: Notification['type']) => {
-    switch (type) {
-      case 'qr': return 'bg-pink-50 text-[#b90064]';
-      case 'shop': return 'bg-gray-100 text-gray-500';
-      case 'payout': return 'bg-emerald-50 text-emerald-500';
-      case 'reward': return 'bg-pink-50 text-[#b90064]';
-      case 'support': return 'bg-blue-50 text-blue-500';
-      default: return 'bg-gray-100 text-gray-500';
+  const getIconBg = (type: NotificationItem['type'], category: NotificationCategory) => {
+    if (category === 'Payments' || type === 'payout' || type === 'payment') {
+      return 'bg-emerald-50 text-emerald-600 border border-emerald-200/80';
     }
+    if (category === 'Support' || type === 'support') {
+      return 'bg-blue-50 text-blue-600 border border-blue-200/80';
+    }
+    if (type === 'qr' || type === 'reward') {
+      return 'bg-pink-50 text-[#b90064] border border-pink-200/80';
+    }
+    return 'bg-amber-50 text-amber-600 border border-amber-200/80';
+  };
+
+  const getCategoryBadge = (category: 'Payments' | 'Support' | 'System') => {
+    switch (category) {
+      case 'Payments':
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+            Payments
+          </span>
+        );
+      case 'Support':
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80 shrink-0">
+            Support
+          </span>
+        );
+      case 'System':
+        return (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/80 shrink-0">
+            System
+          </span>
+        );
+    }
+  };
+
+  // Filtered List Computation
+  const filteredNotifications = notifications.filter(notif => {
+    if (activeTab !== 'All' && notif.category !== activeTab) return false;
+    if (unreadOnly && !notif.unread) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        notif.title.toLowerCase().includes(q) ||
+        notif.message.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  // Category counts
+  const counts = {
+    All: notifications.length,
+    Payments: notifications.filter(n => n.category === 'Payments').length,
+    Support: notifications.filter(n => n.category === 'Support').length,
+    System: notifications.filter(n => n.category === 'System').length,
+    Unread: notifications.filter(n => n.unread).length
   };
 
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-32 font-sans">
       
       {/* Top Header */}
-      <header className="sticky top-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="flex items-center justify-between px-[--page-margin] h-16 w-full max-w-screen-xl mx-auto">
+      <header className="sticky top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs border-b border-gray-100">
+        <div className="flex items-center justify-between px-[--page-margin] h-16 w-full max-w-screen-xl mx-auto gap-2">
           <button 
             onClick={onBack}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 transition-colors active:scale-95 text-[#b90064] cursor-pointer"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 transition-colors active:scale-95 text-[#b90064] cursor-pointer shrink-0"
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-lg font-bold text-[#b90064] flex-1 text-center tracking-tight">Notifications</h1>
-          <button className="text-[10px] font-black text-[#b90064] uppercase tracking-widest hover:bg-pink-50 px-3 py-2 rounded-lg transition-colors cursor-pointer active:scale-95">
-            Mark All Read
+
+          <div className="flex-1 text-center min-w-0">
+            <h1 className="text-lg font-bold text-[#b90064] tracking-tight flex items-center justify-center gap-1.5">
+              <span>Notifications</span>
+              {counts.Unread > 0 && (
+                <span className="bg-[#b90064] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs">
+                  {counts.Unread} new
+                </span>
+              )}
+            </h1>
+          </div>
+
+          <button 
+            onClick={handleMarkAllRead}
+            disabled={counts.Unread === 0}
+            className="text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 bg-pink-50 text-[#b90064] hover:bg-pink-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <CheckCircle2 size={13} />
+            <span className="hidden sm:inline">Mark All Read</span>
+            <span className="sm:hidden">Read</span>
           </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="relative group/tabs border-t border-gray-50">
+        {/* Primary Tab Filters: All, Payments, Support, System */}
+        <div className="relative border-t border-gray-100 bg-gray-50/80">
           {showLeftArrow && (
             <button 
               onClick={() => scroll('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-1 text-[#b90064] transition-opacity"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-1 text-[#b90064]"
             >
               <ChevronLeft size={16} strokeWidth={3} />
             </button>
@@ -165,7 +316,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
           {showRightArrow && (
             <button 
               onClick={() => scroll('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-1 text-[#b90064] transition-opacity"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-1 text-[#b90064]"
             >
               <ChevronRight size={16} strokeWidth={3} />
             </button>
@@ -173,77 +324,189 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
 
           <div 
             ref={scrollRef}
-            className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-3 flex gap-2.5 scroll-smooth"
+            className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-2.5 flex items-center gap-2 scroll-smooth"
           >
-            {FILTERS.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${
-                  activeFilter === filter 
-                    ? 'bg-[#b90064] text-white shadow-md shadow-pink-100' 
-                    : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+            {CATEGORY_TABS.map((tab) => {
+              const TabIcon = tab.icon;
+              const isActive = activeTab === tab.id;
+              const countVal = counts[tab.id];
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center gap-2 ${
+                    isActive 
+                      ? 'bg-[#b90064] text-white shadow-md shadow-pink-200/60' 
+                      : 'bg-white text-gray-600 border border-gray-200/80 hover:bg-gray-100/80 hover:text-gray-900'
+                  }`}
+                >
+                  <TabIcon size={14} className={isActive ? 'text-white' : 'text-gray-500'} />
+                  <span>{tab.label}</span>
+                  <span
+                    className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    {countVal}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+        </div>
+
+        {/* Search Bar & Unread Filter Sub-bar */}
+        <div className="w-full max-w-screen-xl mx-auto px-[--page-margin] py-2.5 flex items-center gap-2 border-t border-gray-100 bg-white">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 text-gray-900 pl-8 pr-3 py-1.5 text-xs font-medium rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[#b90064]"
+            />
+          </div>
+
+          <button
+            onClick={() => setUnreadOnly(!unreadOnly)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              unreadOnly
+                ? 'bg-pink-100 text-[#b90064] border border-pink-200'
+                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            <span>Unread ({counts.Unread})</span>
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] py-6 flex flex-col gap-4">
+      {/* Main Content List */}
+      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] py-5 flex flex-col gap-3">
         <AnimatePresence mode="popLayout">
-          {notifications.filter(notif => {
-            if (activeFilter === 'Unread') return notif.unread;
-            if (activeFilter === 'Shops') return notif.type === 'shop';
-            if (activeFilter === 'QR Qualification') return notif.type === 'qr';
-            if (activeFilter === 'Payouts' || activeFilter === 'Earnings') return notif.type === 'payout';
-            if (activeFilter === 'Rewards') return notif.type === 'reward';
-            if (activeFilter === 'Support') return notif.type === 'support';
-            return true;
-          }).map((notif, idx) => (
+          {filteredNotifications.length > 0 ? (
+            filteredNotifications.map((notif, idx) => (
+              <motion.div
+                key={notif.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: idx * 0.03 }}
+                className={`relative bg-white rounded-[18px] border shadow-xs p-4 flex flex-col gap-3 group transition-all hover:shadow-md ${
+                  notif.unread
+                    ? 'border-pink-200/90 bg-white'
+                    : 'border-gray-100/90 opacity-80 hover:opacity-100 bg-gray-50/30'
+                }`}
+              >
+                {/* Unread Accent Bar */}
+                {notif.unread && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#b90064] rounded-l-full"></div>
+                )}
+
+                <div className="flex gap-3 items-start justify-between">
+                  <div className="flex gap-3 items-start flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${getIconBg(notif.type, notif.category)}`}>
+                      {getIcon(notif.type)}
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getCategoryBadge(notif.category)}
+                        <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
+                          <Clock size={11} className="text-gray-300" />
+                          {notif.time}
+                        </span>
+                      </div>
+
+                      <h3 className="text-sm font-bold text-[#1b1c1b] leading-snug tracking-tight group-hover:text-[#b90064] transition-colors">
+                        {notif.title}
+                      </h3>
+
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {notif.message}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions Header */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleToggleRead(notif.id)}
+                      className={`p-1.5 rounded-lg text-xs transition-colors ${
+                        notif.unread
+                          ? 'bg-pink-50 text-[#b90064] hover:bg-pink-100'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                      title={notif.unread ? 'Mark as read' : 'Mark as unread'}
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleArchive(notif.id)}
+                      className="p-1.5 rounded-lg bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Archive notification"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Primary Button Action */}
+                <div className="pt-1 flex justify-end">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) {
+                        if (notif.type === 'shop' || notif.type === 'qr') onNavigate('shops');
+                        else if (notif.type === 'payout' || notif.type === 'payment') onNavigate('earnings');
+                        else onNavigate('support');
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                      notif.unread
+                        ? 'bg-[#FDE7F3] text-[#b90064] hover:bg-pink-100'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span>{notif.buttonLabel}</span>
+                  </button>
+                </div>
+              </motion.div>
+            ))
+          ) : (
             <motion.div
-              key={notif.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className={`relative bg-white rounded-[20px] border border-gray-100 shadow-sm p-4 flex flex-col gap-4 group overflow-hidden transition-all hover:shadow-md ${
-                !notif.unread ? 'opacity-70 hover:opacity-100' : ''
-              }`}
+              className="py-16 px-4 text-center bg-white rounded-2xl border border-gray-100 shadow-xs flex flex-col items-center justify-center gap-3 my-4"
             >
-              {notif.unread && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#b90064]"></div>
-              )}
-              
-              <div className="flex gap-4 items-start">
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-xs ${getIconBg(notif.type)}`}>
-                  {getIcon(notif.type)}
-                </div>
-                
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-bold text-[#1b1c1b] leading-snug tracking-tight group-hover:text-[#b90064] transition-colors">
-                    {notif.title}
-                  </p>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Clock size={12} className="text-gray-300" />
-                    {notif.time}
-                  </p>
-                </div>
+              <div className="w-14 h-14 rounded-2xl bg-pink-50 text-[#b90064] flex items-center justify-center">
+                <Inbox size={28} />
               </div>
-
-              <div className="flex gap-3">
-                <button className={`w-full h-11 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer ${
-                  notif.unread 
-                    ? 'bg-[#FDE7F3] text-[#b90064] hover:bg-pink-100' 
-                    : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
-                }`}>
-                  {notif.buttonLabel}
+              <div className="space-y-1 max-w-xs">
+                <h3 className="text-base font-bold text-gray-900">No Notifications Found</h3>
+                <p className="text-xs text-gray-500">
+                  {unreadOnly
+                    ? 'No unread notifications in this category.'
+                    : `There are no ${activeTab === 'All' ? '' : activeTab} notifications at this moment.`}
+                </p>
+              </div>
+              {(unreadOnly || searchQuery || activeTab !== 'All') && (
+                <button
+                  onClick={() => {
+                    setActiveTab('All');
+                    setUnreadOnly(false);
+                    setSearchQuery('');
+                  }}
+                  className="mt-2 text-xs font-bold text-[#b90064] bg-pink-50 hover:bg-pink-100 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                >
+                  Reset Filters
                 </button>
-              </div>
+              )}
             </motion.div>
-          ))}
+          )}
         </AnimatePresence>
       </main>
 
@@ -252,3 +515,4 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
     </div>
   );
 }
+

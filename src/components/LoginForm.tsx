@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, User, Lock, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, AlertCircle, Mail, CheckCircle2, X } from 'lucide-react';
 
 export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -10,6 +10,12 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [passwordStrength, setPasswordStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
   const [message, setMessage] = useState<{ type: 'error' | 'warning' | 'info'; text: string } | null>(null);
+
+  // Forgot password modal state
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [resetError, setResetError] = useState('');
 
   useEffect(() => {
     const savedUsername = localStorage.getItem('rememberedUsername');
@@ -53,8 +59,29 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     onLoginSuccess();
   };
 
+  const handleOpenForgot = () => {
+    setResetEmail(username || '');
+    setResetError('');
+    setResetStatus('idle');
+    setIsForgotOpen(true);
+  };
+
+  const handleSendResetLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetError('Please enter your registered email address or mobile number.');
+      return;
+    }
+    setResetError('');
+    setResetStatus('sending');
+
+    setTimeout(() => {
+      setResetStatus('sent');
+    }, 1200);
+  };
+
   return (
-    <div className="bg-white rounded-[18px] p-6 w-full shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border border-[#e4e2e1]">
+    <div className="bg-white rounded-[18px] p-6 w-full shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border border-[#e4e2e1] relative">
       {message && (
         <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${message.type === 'error' ? 'bg-[#ffdad6] text-[#93000a]' : 'bg-[#fde7f3] text-[#b90064]'}`}>
           <AlertCircle size={18} />
@@ -93,7 +120,7 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                 setErrors(prev => ({ ...prev, password: checkPasswordStrength(e.target.value) }));
               }}
             />
-            <button className="ml-2 text-[#b90064]" type="button" onClick={() => setShowPassword(!showPassword)}>
+            <button className="ml-2 text-[#b90064] cursor-pointer" type="button" onClick={() => setShowPassword(!showPassword)}>
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
@@ -114,12 +141,96 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
             />
             <span className="text-sm text-[#5a3f47]">Remember Me</span>
           </label>
-          <button className="text-sm font-medium text-[#b90064] hover:underline" type="button">Forgot Password?</button>
+          <button 
+            type="button" 
+            onClick={handleOpenForgot}
+            className="text-sm font-medium text-[#b90064] hover:underline cursor-pointer"
+          >
+            Forgot Password?
+          </button>
         </div>
-        <button className="w-full h-[56px] bg-[#e6007e] text-white font-medium text-sm rounded-[16px] transition-transform active:scale-95 hover:opacity-90" type="submit">
+        <button className="w-full h-[56px] bg-[#e6007e] text-white font-medium text-sm rounded-[16px] transition-transform active:scale-95 hover:opacity-90 cursor-pointer" type="submit">
           Login
         </button>
       </form>
+
+      {/* Forgot Password Modal */}
+      {isForgotOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-[24px] p-6 w-full max-w-sm shadow-2xl border border-gray-100 relative text-left animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              type="button"
+              onClick={() => setIsForgotOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {resetStatus === 'sent' ? (
+              <div className="text-center py-3 space-y-4">
+                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Reset Link Sent!</h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  We have sent a password reset link to <strong className="text-gray-900">{resetEmail}</strong>. Please check your email inbox and spam folder.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotOpen(false)}
+                  className="w-full h-12 bg-[#b90064] text-white font-bold text-sm rounded-xl hover:bg-[#b90064]/90 transition-colors cursor-pointer"
+                >
+                  Back to Login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSendResetLink} className="space-y-4">
+                <div className="flex items-center gap-2.5 text-[#b90064] mb-1">
+                  <div className="p-2 bg-[#FDE7F3] rounded-xl">
+                    <Mail size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900">Forgot Password</h3>
+                    <p className="text-xs text-gray-500">Reset your login credentials</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Enter your registered email address or 10-digit mobile number, and we will send you a link to reset your password.
+                </p>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600 ml-1">Email or Mobile Number</label>
+                  <div className="flex items-center bg-[#f0edec] rounded-xl h-12 px-3.5 border border-transparent focus-within:border-[#b90064] transition-all">
+                    <User className="text-gray-500 mr-2 shrink-0" size={18} />
+                    <input 
+                      type="text"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="e.g. rajesh@example.com or 9832145678"
+                      className="bg-transparent border-none outline-none w-full text-xs text-gray-900 placeholder:text-gray-400 font-medium"
+                    />
+                  </div>
+                  {resetError && <p className="text-[11px] text-[#93000a] mt-1 font-medium">{resetError}</p>}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={resetStatus === 'sending'}
+                  className="w-full h-12 bg-[#b90064] text-white font-bold text-sm rounded-xl hover:bg-[#b90064]/90 transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {resetStatus === 'sending' ? (
+                    <span>Sending Reset Link...</span>
+                  ) : (
+                    <span>Send Reset Link</span>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

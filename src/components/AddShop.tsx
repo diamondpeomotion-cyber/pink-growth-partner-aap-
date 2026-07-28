@@ -36,8 +36,72 @@ import {
   Scissors,
 
   IdCard,
-  Info
+  Info,
+  AlertTriangle,
+  Eye,
+  FileBadge,
+  Award
 } from 'lucide-react';
+
+export type GovtDocType = 'aadhaar_front' | 'aadhaar_back' | 'pan_card' | 'voter_id' | 'shop_front' | 'other';
+
+export interface UploadedDocRecord {
+  id: string;
+  type: GovtDocType | string;
+  typeLabel: string;
+  fileName: string;
+  fileSize: string;
+  fileSizeBytes: number;
+  previewUrl: string | null;
+  isImage: boolean;
+  uploadedAt: string;
+}
+
+export interface GovtDocSlotInfo {
+  type: GovtDocType;
+  label: string;
+  shortLabel: string;
+  required: boolean;
+  description: string;
+}
+
+const GOVT_DOC_SLOTS: GovtDocSlotInfo[] = [
+  {
+    type: 'aadhaar_front',
+    label: 'Aadhaar Card - Front',
+    shortLabel: 'Aadhaar Front',
+    required: true,
+    description: 'Front side with photo, full name & date of birth'
+  },
+  {
+    type: 'aadhaar_back',
+    label: 'Aadhaar Card - Back',
+    shortLabel: 'Aadhaar Back',
+    required: false,
+    description: 'Back side showing full address & barcode'
+  },
+  {
+    type: 'pan_card',
+    label: 'PAN Card',
+    shortLabel: 'PAN Card',
+    required: true,
+    description: 'Permanent Account Number identity card'
+  },
+  {
+    type: 'voter_id',
+    label: 'Voter ID / Election Card',
+    shortLabel: 'Voter ID',
+    required: false,
+    description: 'Electoral Photo Identity Card (EPIC)'
+  },
+  {
+    type: 'shop_front',
+    label: 'Shop Front Photo',
+    shortLabel: 'Shop Front',
+    required: true,
+    description: 'Clear exterior photo showing shop name signage'
+  }
+];
 
 const FORM_STEPS = [
   { id: 1, name: 'Owner', icon: User, label: 'Owner Details' },
@@ -103,6 +167,37 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
   // Step 4 State: Website Setup & Branding
   const [websiteUrl, setWebsiteUrl] = useState('https://glowbeautyparlour.com');
+  const [isPublished, setIsPublished] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('store_is_published');
+      if (saved !== null) return JSON.parse(saved);
+      const draft = localStorage.getItem('add_shop_form_draft');
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.isPublished !== undefined) return parsed.isPublished;
+      }
+    } catch (e) {}
+    return true;
+  });
+
+  const handleTogglePublish = () => {
+    const next = !isPublished;
+    setIsPublished(next);
+    try {
+      localStorage.setItem('store_is_published', JSON.stringify(next));
+      const savedDraft = localStorage.getItem('add_shop_form_draft');
+      const parsedDraft = savedDraft ? JSON.parse(savedDraft) : {};
+      parsedDraft.isPublished = next;
+      localStorage.setItem('add_shop_form_draft', JSON.stringify(parsedDraft));
+    } catch (e) {
+      console.error(e);
+    }
+    if (next) {
+      triggerDocToast('success', 'Store Published', 'Store is now live!');
+    } else {
+      triggerDocToast('info', 'Store Unpublished', 'Store is currently hidden from public.');
+    }
+  };
   const [instagramHandle, setInstagramHandle] = useState('@glowbeauty_jaipur');
   const [socialLinks, setSocialLinks] = useState({
     facebook: 'https://facebook.com/glowbeautyjaipur',
@@ -268,8 +363,274 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [ownerIdProofSize, setOwnerIdProofSize] = useState<string>('1.2 MB');
   const [shopFrontFile, setShopFrontFile] = useState<string | null>('glow-shop-front.jpg');
   const [shopFrontPreview, setShopFrontPreview] = useState<string | null>('https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk');
+
+  // Enhanced Document Management State
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([
+    {
+      id: 'doc_aadhaar_front',
+      type: 'aadhaar_front',
+      typeLabel: 'Aadhaar Card - Front',
+      fileName: 'aadhaar-card-front.jpg',
+      fileSize: '1.4 MB',
+      fileSizeBytes: 1468006,
+      previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop',
+      isImage: true,
+      uploadedAt: new Date().toLocaleDateString()
+    },
+    {
+      id: 'doc_pan_card',
+      type: 'pan_card',
+      typeLabel: 'PAN Card',
+      fileName: 'pan-card-owner.pdf',
+      fileSize: '0.9 MB',
+      fileSizeBytes: 943718,
+      previewUrl: null,
+      isImage: false,
+      uploadedAt: new Date().toLocaleDateString()
+    },
+    {
+      id: 'doc_shop_front',
+      type: 'shop_front',
+      typeLabel: 'Shop Front Photo',
+      fileName: 'glow-shop-front.jpg',
+      fileSize: '2.3 MB',
+      fileSizeBytes: 2411724,
+      previewUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk',
+      isImage: true,
+      uploadedAt: new Date().toLocaleDateString()
+    }
+  ]);
+
+  const [selectedDocTypeForUpload, setSelectedDocTypeForUpload] = useState<GovtDocType | 'other'>('aadhaar_front');
+  const [customDocTypeLabel, setCustomDocTypeLabel] = useState<string>('');
+
+  // Toast alert state
+  const [docToast, setDocToast] = useState<{
+    id: number;
+    type: 'warning' | 'error' | 'success' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const triggerDocToast = (type: 'warning' | 'error' | 'success' | 'info', title: string, message: string) => {
+    const toastId = Date.now();
+    setDocToast({ id: toastId, type, title, message });
+    setTimeout(() => {
+      setDocToast(prev => (prev?.id === toastId ? null : prev));
+    }, 5000);
+  };
+
+  // Preview Modal state
+  const [previewDocModal, setPreviewDocModal] = useState<UploadedDocRecord | null>(null);
+
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB Limit
+
+  // File Upload Processor enforcing 5 MB size limit & duplicate checks
+  const handleDocFileUpload = (
+    targetType: string,
+    targetTypeLabel: string,
+    file: File,
+    isReplacement: boolean = false
+  ): boolean => {
+    // 1. File Size Validation (Max 5 MB)
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      triggerDocToast(
+        'error',
+        'File Size Exceeded (Max 5 MB)',
+        `"${file.name}" is ${fileSizeMB} MB. Maximum allowed upload size is 5.0 MB per document.`
+      );
+      return false;
+    }
+
+    // 1b. Format Validation for Shop Front Photo (JPG, PNG, WEBP)
+    if (targetType === 'shop_front') {
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const isValidExt = ext && ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+      
+      if (!file.type.startsWith('image/') && !isValidExt) {
+        triggerDocToast(
+          'error',
+          'Invalid Image Format',
+          `"${file.name}" is not a supported image format. Please upload a valid JPG, PNG, or WEBP image for the Shop Front Photo.`
+        );
+        return false;
+      }
+    }
+
+    // 2. Duplicate Document Type Check (unless replacing existing document)
+    if (!isReplacement) {
+      const existingDocByType = uploadedDocs.find(d => d.type === targetType);
+      if (existingDocByType) {
+        triggerDocToast(
+          'warning',
+          'Duplicate Document Type Alert',
+          `A document for "${targetTypeLabel}" (${existingDocByType.fileName}) is already uploaded. Please remove or replace the existing document.`
+        );
+        return false;
+      }
+    }
+
+    // 3. Duplicate File Name Check
+    const existingDocByName = uploadedDocs.find(
+      d => d.fileName.toLowerCase() === file.name.toLowerCase() && d.type !== targetType
+    );
+    if (existingDocByName) {
+      triggerDocToast(
+        'warning',
+        'Duplicate File Name Detected',
+        `The file "${file.name}" has already been uploaded for "${existingDocByName.typeLabel}".`
+      );
+      return false;
+    }
+
+    // 4. Create object URL preview if image file
+    const isImageFile = file.type.startsWith('image/');
+    let previewUrl: string | null = null;
+    if (isImageFile) {
+      try {
+        previewUrl = URL.createObjectURL(file);
+      } catch (err) {
+        previewUrl = null;
+      }
+    }
+
+    const formattedSize = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+
+    const newDocRecord: UploadedDocRecord = {
+      id: 'doc_' + Date.now(),
+      type: targetType,
+      typeLabel: targetTypeLabel,
+      fileName: file.name,
+      fileSize: formattedSize,
+      fileSizeBytes: file.size,
+      previewUrl: previewUrl,
+      isImage: isImageFile,
+      uploadedAt: new Date().toLocaleDateString()
+    };
+
+    setUploadedDocs(prev => {
+      const filtered = isReplacement ? prev.filter(d => d.type !== targetType) : prev;
+      return [...filtered, newDocRecord];
+    });
+
+    // Synchronize legacy variables
+    if (targetType === 'aadhaar_front' || targetType === 'pan_card' || targetType === 'voter_id') {
+      setOwnerIdProofFile(file.name);
+      setOwnerIdProofSize(formattedSize);
+    }
+    if (targetType === 'shop_front') {
+      setShopFrontFile(file.name);
+      if (previewUrl) setShopFrontPreview(previewUrl);
+    }
+
+    triggerDocToast(
+      'success',
+      'Document Uploaded Successfully',
+      `"${targetTypeLabel}" (${file.name}) has been verified and added.`
+    );
+
+    return true;
+  };
+
+  // Sample Upload Generator for instant demo testing
+  const handleDocSampleUpload = (targetType: string, targetTypeLabel: string) => {
+    const sampleDocs: Record<string, { name: string; url: string; sizeBytes: number }> = {
+      aadhaar_front: {
+        name: 'aadhaar-card-front.jpg',
+        url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop',
+        sizeBytes: 1468006
+      },
+      aadhaar_back: {
+        name: 'aadhaar-card-back.jpg',
+        url: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=400&auto=format&fit=crop',
+        sizeBytes: 1258291
+      },
+      pan_card: {
+        name: 'pan-card-verified.jpg',
+        url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=400&auto=format&fit=crop',
+        sizeBytes: 985700
+      },
+      voter_id: {
+        name: 'voter-id-card.jpg',
+        url: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?q=80&w=400&auto=format&fit=crop',
+        sizeBytes: 1887436
+      },
+      shop_front: {
+        name: 'glow-shop-front.jpg',
+        url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk',
+        sizeBytes: 2411724
+      }
+    };
+
+    const sample = sampleDocs[targetType] || {
+      name: `${targetTypeLabel.toLowerCase().replace(/[^a-z0-9]/g, '-')}-doc.jpg`,
+      url: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=400&auto=format&fit=crop',
+      sizeBytes: 1572864
+    };
+
+    // Check duplicate
+    const existing = uploadedDocs.find(d => d.type === targetType);
+    if (existing) {
+      triggerDocToast(
+        'warning',
+        'Duplicate Document Type Alert',
+        `A document for "${targetTypeLabel}" (${existing.fileName}) is already uploaded. Please remove or replace the existing document.`
+      );
+      return;
+    }
+
+    const formattedSize = (sample.sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
+    const newDocRecord: UploadedDocRecord = {
+      id: 'doc_' + Date.now(),
+      type: targetType,
+      typeLabel: targetTypeLabel,
+      fileName: sample.name,
+      fileSize: formattedSize,
+      fileSizeBytes: sample.sizeBytes,
+      previewUrl: sample.url,
+      isImage: true,
+      uploadedAt: new Date().toLocaleDateString()
+    };
+
+    setUploadedDocs(prev => [...prev, newDocRecord]);
+
+    if (targetType === 'aadhaar_front' || targetType === 'pan_card' || targetType === 'voter_id') {
+      setOwnerIdProofFile(sample.name);
+      setOwnerIdProofSize(formattedSize);
+    }
+    if (targetType === 'shop_front') {
+      setShopFrontFile(sample.name);
+      setShopFrontPreview(sample.url);
+    }
+
+    triggerDocToast(
+      'success',
+      'Sample Document Attached',
+      `"${targetTypeLabel}" (${sample.name}) attached successfully.`
+    );
+  };
+
+  const handleRemoveDoc = (docId: string, typeLabel: string, type: string) => {
+    setUploadedDocs(prev => prev.filter(d => d.id !== docId));
+    if (type === 'aadhaar_front' || type === 'pan_card' || type === 'voter_id') {
+      setOwnerIdProofFile(null);
+      setOwnerIdProofSize('');
+    }
+    if (type === 'shop_front') {
+      setShopFrontFile(null);
+      setShopFrontPreview(null);
+    }
+    triggerDocToast(
+      'info',
+      'Document Removed',
+      `"${typeLabel}" has been removed.`
+    );
+  };
   const [confirmAccurate, setConfirmAccurate] = useState<boolean>(true);
   const [authorizeProfile, setAuthorizeProfile] = useState<boolean>(true);
+  const [documentPrivacyConsent, setDocumentPrivacyConsent] = useState<boolean>(false);
   const [step6Confirmed, setStep6Confirmed] = useState<boolean>(false);
   const [policyConfirmed, setPolicyConfirmed] = useState<boolean>(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState<boolean>(false);
@@ -516,6 +877,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         if (parsed.businessType !== undefined) setBusinessType(parsed.businessType);
         if (parsed.annualTurnover !== undefined) setAnnualTurnover(parsed.annualTurnover);
         if (parsed.websiteUrl !== undefined) setWebsiteUrl(parsed.websiteUrl);
+        if (parsed.isPublished !== undefined) setIsPublished(parsed.isPublished);
         if (parsed.instagramHandle !== undefined) setInstagramHandle(parsed.instagramHandle);
         if (parsed.socialLinks !== undefined) setSocialLinks(parsed.socialLinks);
         if (parsed.customLinks !== undefined) setCustomLinks(parsed.customLinks);
@@ -551,6 +913,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         businessType,
         annualTurnover,
         websiteUrl,
+        isPublished,
         instagramHandle,
         socialLinks,
         customLinks,
@@ -587,6 +950,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     businessType,
     annualTurnover,
     websiteUrl,
+    isPublished,
     instagramHandle,
     socialLinks,
     customLinks,
@@ -616,6 +980,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       businessType,
       annualTurnover,
       websiteUrl,
+      isPublished,
       instagramHandle,
       socialLinks,
       customLinks,
@@ -706,10 +1071,23 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
 
   // Validation functions per step (always allow continue, auto-save in background)
-  const isStepValid = (stepId: number): boolean => true;
+  const isStepValid = (stepId: number): boolean => {
+    if (stepId === 5) return documentPrivacyConsent;
+    return true;
+  };
   const canNavigateToStep = (targetStep: number): boolean => true;
 
   const handleStepChange = (targetStep: number) => {
+    if (currentStep === 5 && targetStep > 5) {
+      if (!documentPrivacyConsent) {
+        triggerDocToast(
+          'error',
+          'Document Privacy Consent Required',
+          'Please acknowledge the document privacy & security consent before proceeding to Step 6.'
+        );
+        return;
+      }
+    }
     setCurrentStep(targetStep);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -2326,6 +2704,94 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
             {/* Right Column: Contextual Sidebar */}
             <div className="lg:col-span-4 flex flex-col gap-4">
+              {/* Website Settings & Store Publish Status */}
+              <div className="bg-white rounded-[18px] p-5 border border-[#E8E8E8] shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-xl">settings</span>
+                    <h3 className="text-base font-bold text-gray-900">Website Settings</h3>
+                  </div>
+                  {/* Status Badge */}
+                  {isPublished ? (
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      ● PUBLISHED (LIVE)
+                    </span>
+                  ) : (
+                    <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      ○ UNPUBLISHED (DRAFT)
+                    </span>
+                  )}
+                </div>
+
+                {/* Interactive Toggle Control */}
+                <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200/80 flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-900">Store Publish Status</span>
+                    <span className="text-[11px] text-gray-500 mt-0.5">
+                      {isPublished ? 'Publicly accessible to clients' : 'Hidden from public access'}
+                    </span>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isPublished}
+                    onClick={handleTogglePublish}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                      isPublished ? 'bg-emerald-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        isPublished ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Domain & Live Preview Link */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Live Store Address</label>
+                  <div className="flex items-center justify-between gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+                    <span className="text-xs font-medium text-gray-700 truncate">{websiteUrl || 'https://glowbeautyparlour.com'}</span>
+                    {isPublished ? (
+                      <a
+                        href={websiteUrl || 'https://glowbeautyparlour.com'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1 shrink-0 bg-pink-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                        Preview Store
+                      </a>
+                    ) : (
+                      <span
+                        className="text-xs font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg cursor-not-allowed flex items-center gap-1 select-none"
+                        title="Store is currently hidden from public"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">lock</span>
+                        Preview Store
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Notice Message */}
+                {isPublished ? (
+                  <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 mt-0.5 shrink-0">check_circle</span>
+                    <span>Store is now live! Customers can visit your storefront URL and book services online.</span>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 mt-0.5 shrink-0">info</span>
+                    <span>Store is currently hidden from public.</span>
+                  </div>
+                )}
+              </div>
               <div className="bg-white rounded-[18px] p-5 border border-[#E8E8E8] shadow-sm lg:sticky lg:top-24">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">preview</span> Website Preview
@@ -2453,153 +2919,406 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
               </div>
             </section>
 
-            {/* Document Uploads */}
+            {/* Toast Alert Banner for Duplicate Prevention & File Size Limit */}
+            <AnimatePresence>
+              {docToast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -15, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                  className={`p-4 rounded-2xl border shadow-lg flex items-start gap-3 relative overflow-hidden ${
+                    docToast.type === 'error'
+                      ? 'bg-red-50 border-red-200 text-red-900'
+                      : docToast.type === 'warning'
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : docToast.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-blue-50 border-blue-200 text-blue-900'
+                  }`}
+                >
+                  <div className="shrink-0 mt-0.5">
+                    {docToast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
+                    {docToast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600" />}
+                    {docToast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                    {docToast.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
+                  </div>
+                  <div className="flex-1 pr-6">
+                    <h4 className="text-xs font-bold uppercase tracking-wider mb-0.5">{docToast.title}</h4>
+                    <p className="text-xs leading-relaxed font-medium">{docToast.message}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDocToast(null)}
+                    className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/5 text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Document Uploads Header */}
             <section className="space-y-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">Upload Required Documents</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Add clear and valid documents for shop verification.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Owner ID */}
-                <div className="bg-white rounded-[18px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-200 flex flex-col min-h-[220px]">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                        Owner ID Proof <span className="text-red-500">*</span>
-                      </h4>
-                      {ownerIdProofFile ? (
-                        <span className="text-emerald-600 text-xs flex items-center gap-1 mt-1 font-semibold">
-                          <CheckCircle2 size={13} className="text-emerald-500" /> Upload completed
-                        </span>
-                      ) : (
-                        <span className="text-red-500 text-xs flex items-center gap-1 mt-1 font-semibold">
-                          <AlertCircle size={13} className="text-red-400" /> No document uploaded
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {ownerIdProofFile ? (
-                    <>
-                      <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3 mb-4 border border-gray-100">
-                        <div className="bg-pink-50 w-10 h-10 rounded-lg flex items-center justify-center text-primary shrink-0">
-                          <IdCard size={20} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-900 truncate">{ownerIdProofFile}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{ownerIdProofSize}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-auto">
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const name = prompt("Enter file name for Owner ID proof:", "owner-id-proof.jpg");
-                            if (name) setOwnerIdProofFile(name);
-                          }}
-                          className="flex-1 bg-pink-50 hover:bg-pink-100 text-primary font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer"
-                        >
-                          Replace
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setOwnerIdProofFile(null);
-                            setOwnerIdProofSize('');
-                          }}
-                          className="flex-1 bg-gray-50 hover:bg-red-50 hover:text-red-600 text-gray-600 font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div 
-                      onClick={() => {
-                        setOwnerIdProofFile('owner-id-proof.jpg');
-                        setOwnerIdProofSize('1.2 MB');
-                      }}
-                      className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-primary/40 bg-gray-50/50 hover:bg-pink-50/5 rounded-xl p-4 text-center cursor-pointer transition-all gap-1.5 mt-auto min-h-[110px]"
-                    >
-                      <Upload size={18} className="text-gray-400" />
-                      <p className="text-xs font-bold text-gray-700">Click to upload document</p>
-                      <p className="text-[10px] text-gray-400">PDF, JPG, PNG up to 5MB</p>
-                    </div>
-                  )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    Upload Required Documents
+                    <span className="text-xs font-semibold px-2.5 py-0.5 bg-pink-50 text-primary border border-pink-200 rounded-full">
+                      Step 5 of 6
+                    </span>
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Upload Government ID proofs (Aadhaar, PAN, Voter ID) and shop exterior photo for verification.
+                  </p>
                 </div>
 
-                {/* Shop Front Photo */}
-                <div className="bg-white rounded-[18px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-200 flex flex-col min-h-[220px]">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                        Shop Front Photo <span className="text-red-500">*</span>
-                      </h4>
-                      {!shopFrontFile && (
-                        <span className="text-red-500 text-xs flex items-center gap-1 mt-1 font-semibold">
-                          <AlertCircle size={13} className="text-red-400" /> Photo required
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {shopFrontFile ? (
-                    <>
-                      <div className="relative w-full h-32 rounded-xl overflow-hidden mb-4 bg-gray-100 group border border-gray-100">
-                        <img 
-                          alt="Shop front preview" 
-                          className="w-full h-full object-cover" 
-                          src={shopFrontPreview || "https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk"} 
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2.5">
-                          <span className="text-white text-[11px] font-semibold flex items-center gap-1.5 truncate">
-                            <ImageIcon size={12} className="text-white/90" /> {shopFrontFile}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-auto">
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const customUrl = prompt("Enter custom Unsplash/Image URL for Shop Front Photo preview:", shopFrontPreview || "");
-                            if (customUrl) {
-                              setShopFrontPreview(customUrl);
-                              setShopFrontFile("custom-shop-front.jpg");
-                            }
-                          }}
-                          className="flex-1 bg-pink-50 hover:bg-pink-100 text-primary font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer"
-                        >
-                          Replace
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setShopFrontFile(null);
-                            setShopFrontPreview(null);
-                          }}
-                          className="flex-1 bg-gray-50 hover:bg-red-50 hover:text-red-600 text-gray-600 font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div 
-                      onClick={() => {
-                        setShopFrontFile('glow-shop-front.jpg');
-                        setShopFrontPreview('https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk');
-                      }}
-                      className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-primary/40 bg-gray-50/50 hover:bg-pink-50/5 rounded-xl p-4 text-center cursor-pointer transition-all gap-1.5 mt-auto min-h-[110px]"
-                    >
-                      <Camera size={18} className="text-gray-400" />
-                      <p className="text-xs font-bold text-gray-700">Click to capture / upload front photo</p>
-                      <p className="text-[10px] text-gray-400">Ensure signage is clearly visible</p>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-bold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-200/80 flex items-center gap-1.5">
+                    <Award size={14} className="text-amber-500" />
+                    <span>
+                      {uploadedDocs.length} of {GOVT_DOC_SLOTS.filter(s => s.required).length} Required Uploaded
+                    </span>
+                  </span>
                 </div>
               </div>
+
+              {/* Document Type Selector Bar */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-4 sm:p-5 rounded-2xl shadow-md space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+                      <FileBadge size={18} className="text-pink-400" />
+                      Document Selection & Universal File Uploader
+                    </h3>
+                    <p className="text-[11px] text-gray-300 mt-0.5">
+                      Select document type first, then choose file (Maximum 5 MB limit enforced).
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30 shrink-0 self-start sm:self-auto flex items-center gap-1">
+                    <ShieldCheck size={12} /> Duplicate Prevention Active
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">
+                      Target Document Type:
+                    </label>
+                    <select
+                      value={selectedDocTypeForUpload}
+                      onChange={(e) => setSelectedDocTypeForUpload(e.target.value as any)}
+                      className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
+                    >
+                      <option value="aadhaar_front">Aadhaar Card - Front (Required)</option>
+                      <option value="aadhaar_back">Aadhaar Card - Back (Address Proof)</option>
+                      <option value="pan_card">PAN Card (Required)</option>
+                      <option value="voter_id">Voter ID / Election Card</option>
+                      <option value="shop_front">Shop Front Photo (Required)</option>
+                      <option value="other">Other Custom Document</option>
+                    </select>
+                  </div>
+
+                  {selectedDocTypeForUpload === 'other' && (
+                    <div className="flex-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">
+                        Document Label / Title:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Trade License, GST Certificate"
+                        value={customDocTypeLabel}
+                        onChange={(e) => setCustomDocTypeLabel(e.target.value)}
+                        className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-end gap-2 pt-2 sm:pt-0">
+                    <label className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 shadow-sm">
+                      <Upload size={14} />
+                      <span>Upload File</span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const slot = GOVT_DOC_SLOTS.find(s => s.type === selectedDocTypeForUpload);
+                            const label = selectedDocTypeForUpload === 'other'
+                              ? (customDocTypeLabel.trim() || 'Custom Document')
+                              : (slot?.label || 'Government ID Proof');
+                            
+                            handleDocFileUpload(selectedDocTypeForUpload, label, e.target.files[0]);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const slot = GOVT_DOC_SLOTS.find(s => s.type === selectedDocTypeForUpload);
+                        const label = selectedDocTypeForUpload === 'other'
+                          ? (customDocTypeLabel.trim() || 'Custom Document')
+                          : (slot?.label || 'Government ID Proof');
+                        handleDocSampleUpload(selectedDocTypeForUpload, label);
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-gray-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+                      title="Attach sample demo file"
+                    >
+                      <Sparkles size={13} className="text-amber-400" />
+                      <span className="hidden sm:inline">Attach Demo</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid of Dedicated Government ID & Shop Document Upload Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {GOVT_DOC_SLOTS.map((slot) => {
+                  const existingDoc = uploadedDocs.find(d => d.type === slot.type);
+                  const isShopFront = slot.type === 'shop_front';
+
+                  return (
+                    <div
+                      key={slot.type}
+                      className={`bg-white rounded-[18px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border flex flex-col justify-between transition-all ${
+                        isShopFront ? 'border-pink-300 ring-2 ring-pink-500/10' : 'border-gray-200 hover:border-pink-200'
+                      }`}
+                    >
+                      <div>
+                        {/* Card Header */}
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                              {isShopFront && <Camera size={14} className="text-primary shrink-0" />}
+                              {slot.label} {slot.required && <span className="text-red-500">*</span>}
+                            </h4>
+                            <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                              {slot.description}
+                            </p>
+                          </div>
+                          {existingDoc ? (
+                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 shrink-0 flex items-center gap-1 shadow-2xs">
+                              <CheckCircle2 size={12} className="text-emerald-600" /> Uploaded
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold bg-gray-50 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 shrink-0">
+                              {slot.required ? 'Required' : 'Optional'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fixed Aspect Ratio Preview Box */}
+                        <div className="relative w-full h-40 bg-slate-900/5 dark:bg-slate-800/40 rounded-xl overflow-hidden border border-gray-200/80 flex items-center justify-center p-1.5 my-2 group">
+                          {existingDoc ? (
+                            existingDoc.isImage && existingDoc.previewUrl ? (
+                              <div className="w-full h-full relative overflow-hidden rounded-lg group">
+                                <img
+                                  src={existingDoc.previewUrl}
+                                  alt={existingDoc.typeLabel}
+                                  className="w-full h-full object-cover rounded-lg shadow-xs transition-transform duration-300 group-hover:scale-105"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewDocModal(existingDoc)}
+                                    className="bg-white/90 hover:bg-white text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1 transition-transform active:scale-95"
+                                  >
+                                    <Eye size={13} /> Full View
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-center p-3">
+                                <div className="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs mb-1.5 shadow-xs">
+                                  PDF
+                                </div>
+                                <p className="text-xs font-bold text-gray-900 truncate max-w-[170px]">
+                                  {existingDoc.fileName}
+                                </p>
+                                <span className="text-[10px] text-gray-500 font-medium">
+                                  {existingDoc.fileSize}
+                                </span>
+                              </div>
+                            )
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                              {isShopFront ? (
+                                <div className="flex flex-col items-center justify-center gap-1.5 w-full h-full">
+                                  <div className="p-2.5 bg-pink-50 rounded-full text-primary">
+                                    <Camera size={20} />
+                                  </div>
+                                  <span className="text-xs font-bold text-gray-800">Shop Exterior Photo</span>
+                                  <span className="text-[10px] text-gray-400">JPG, PNG, WEBP (Max 5 MB)</span>
+                                  
+                                  <div className="flex items-center gap-1.5 mt-1 w-full max-w-[200px]">
+                                    <label className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold text-[11px] py-1.5 px-2 rounded-lg text-center cursor-pointer transition-all shadow-xs flex items-center justify-center gap-1">
+                                      <Upload size={12} />
+                                      <span>Upload</span>
+                                      <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          if (e.target.files && e.target.files[0]) {
+                                            handleDocFileUpload(slot.type, slot.label, e.target.files[0]);
+                                            e.target.value = '';
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                    <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] py-1.5 px-2 rounded-lg text-center cursor-pointer transition-all shadow-xs flex items-center justify-center gap-1">
+                                      <Camera size={12} className="text-pink-400" />
+                                      <span>Camera</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          if (e.target.files && e.target.files[0]) {
+                                            handleDocFileUpload(slot.type, slot.label, e.target.files[0]);
+                                            e.target.value = '';
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-primary/50 bg-gray-50/50 hover:bg-pink-50/10 rounded-xl p-3 text-center cursor-pointer transition-all gap-1">
+                                  <Upload size={18} className="text-gray-400 group-hover:text-primary transition-colors" />
+                                  <span className="text-xs font-bold text-gray-700">Upload {slot.shortLabel}</span>
+                                  <span className="text-[10px] text-gray-400">PDF, JPG, PNG (Max 5 MB)</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleDocFileUpload(slot.type, slot.label, e.target.files[0]);
+                                        e.target.value = '';
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Quick Action Buttons */}
+                      <div className="pt-1.5">
+                        {existingDoc ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDocModal(existingDoc)}
+                              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2 rounded-xl transition-colors flex items-center justify-center gap-1"
+                              title="View / Preview Full Size"
+                            >
+                              <Eye size={13} className="text-gray-600" />
+                              <span>Preview</span>
+                            </button>
+
+                            <label className="flex-1 bg-pink-50 hover:bg-pink-100 text-primary font-bold text-xs py-2 rounded-xl text-center transition-colors cursor-pointer flex items-center justify-center gap-1">
+                              <Upload size={13} />
+                              <span>Replace</span>
+                              <input
+                                type="file"
+                                accept={isShopFront ? "image/jpeg,image/png,image/webp,image/*" : "image/*,.pdf"}
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleDocFileUpload(slot.type, slot.label, e.target.files[0], true);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDoc(existingDoc.id, existingDoc.typeLabel, existingDoc.type)}
+                              className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1"
+                              title="Remove Photo"
+                            >
+                              <Trash2 size={13} />
+                              <span className="hidden sm:inline">Remove</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <label className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs py-2 rounded-xl text-center transition-colors cursor-pointer block">
+                              Select File
+                              <input
+                                type="file"
+                                accept={isShopFront ? "image/jpeg,image/png,image/webp,image/*" : "image/*,.pdf"}
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleDocFileUpload(slot.type, slot.label, e.target.files[0]);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleDocSampleUpload(slot.type, slot.label)}
+                              className="px-3 py-2 bg-pink-50 hover:bg-pink-100 text-primary font-bold text-xs rounded-xl transition-colors"
+                              title="Attach sample demo file"
+                            >
+                              Demo File
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Custom / Additional Uploaded Documents Section */}
+              {uploadedDocs.filter(d => !GOVT_DOC_SLOTS.some(s => s.type === d.type)).length > 0 && (
+                <div className="mt-4 bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-3">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText size={15} className="text-indigo-600" /> Additional Custom Uploaded Documents
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {uploadedDocs
+                      .filter(d => !GOVT_DOC_SLOTS.some(s => s.type === d.type))
+                      .map(doc => (
+                        <div key={doc.id} className="bg-white p-3 rounded-xl border border-gray-200 flex items-center justify-between gap-2 shadow-xs">
+                          <div className="min-w-0 flex-1">
+                            <h5 className="text-xs font-bold text-gray-900 truncate">{doc.typeLabel}</h5>
+                            <p className="text-[10px] text-gray-500 truncate">{doc.fileName} • {doc.fileSize}</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDocModal(doc)}
+                              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDoc(doc.id, doc.typeLabel, doc.type)}
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Owner Consent */}
@@ -2641,6 +3360,25 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   </div>
                   <span className="text-xs font-medium text-gray-700 group-hover:text-primary transition-colors">
                     I authorize the creation of a profile.
+                  </span>
+                </label>
+
+                {/* Mandatory Document Privacy & Security Consent */}
+                <label className="flex items-start gap-3 cursor-pointer group pt-2 border-t border-gray-200/60">
+                  <div className="relative flex items-center mt-0.5">
+                    <input 
+                      type="checkbox"
+                      checked={documentPrivacyConsent}
+                      onChange={(e) => setDocumentPrivacyConsent(e.target.checked)}
+                      required
+                      className="h-5 w-5 rounded-full border-gray-300 bg-white text-primary focus:ring-primary/20 transition-all cursor-pointer appearance-none checked:border-primary checked:bg-primary"
+                    />
+                    {documentPrivacyConsent && (
+                      <Check size={14} className="text-white absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none stroke-[3px]" />
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-gray-800 group-hover:text-primary transition-colors leading-relaxed">
+                    I acknowledge that all uploaded documents (Aadhaar, PAN, Voter ID, Shop Front Photo) will be used solely for identity and business verification purposes and will be handled securely without misuse. <span className="text-red-500 font-bold">*</span>
                   </span>
                 </label>
               </div>
@@ -2846,11 +3584,36 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   </div>
                   <div className="flex flex-col md:flex-row gap-6 items-start pl-2">
                     <div className="flex-1 w-full space-y-4">
-                      <div>
-                        <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Selected Template</span>
-                        <span className="text-sm font-bold text-gray-900 capitalize">
-                          {selectedTemplate ? selectedTemplate.replace('-', ' ') : 'Modern Salon'}
-                        </span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Selected Template</span>
+                          <span className="text-sm font-bold text-gray-900 capitalize">
+                            {selectedTemplate ? selectedTemplate.replace('-', ' ') : 'Modern Salon'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Store Publish Status</span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {isPublished ? (
+                              <span className="px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full text-xs font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                ● PUBLISHED (LIVE)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full text-xs font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                ○ UNPUBLISHED (DRAFT)
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleTogglePublish}
+                              className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                            >
+                              Toggle
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -2967,43 +3730,43 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   <div className="flex justify-between items-start mb-4 pl-2">
                     <div className="flex items-center gap-2">
                       <FileText size={18} className="text-gray-500" />
-                      <h2 className="text-base font-bold text-gray-900">Documents & Consent</h2>
+                      <h2 className="text-base font-bold text-gray-900">
+                        Uploaded Verification Documents ({uploadedDocs.length})
+                      </h2>
                     </div>
                     <button 
                       onClick={() => setCurrentStep(5)} 
                       className="text-xs font-bold text-primary bg-pink-50 hover:bg-pink-100 px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
                     >
-                      Edit
+                      Edit Docs
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2">
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-gray-900 block truncate">Owner ID Proof</span>
-                        <span className="text-[10px] text-gray-500 truncate block">{ownerIdProofFile || 'owner-id-proof.jpg'}</span>
+                    {uploadedDocs.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-gray-900 block truncate">{doc.typeLabel}</span>
+                          <span className="text-[10px] text-gray-500 truncate block">{doc.fileName} ({doc.fileSize})</span>
+                        </div>
+                        {doc.previewUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDocModal(doc)}
+                            className="p-1 bg-white hover:bg-pink-50 text-gray-600 hover:text-primary rounded-lg border border-gray-200 transition-colors shrink-0"
+                            title="Preview Document"
+                          >
+                            <Eye size={13} />
+                          </button>
+                        )}
                       </div>
-                    </div>
+                    ))}
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                      <CheckCircle2 size={16} className={confirmAccurate && authorizeProfile && documentPrivacyConsent ? "text-emerald-500 shrink-0" : "text-amber-500 shrink-0"} />
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-gray-900 block truncate">Shop Front Photo</span>
-                        <span className="text-[10px] text-gray-500 truncate block">{shopFrontFile || 'glow-shop-front.jpg'}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-gray-900 block truncate">Business Proof</span>
-                        <span className="text-[10px] text-gray-500 block">GSTIN & PAN Details</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-gray-900 block truncate">Owner Consent</span>
-                        <span className="text-[10px] text-gray-500 block">
-                          {confirmAccurate && authorizeProfile ? 'Completed' : 'Pending'}
+                        <span className="text-xs font-bold text-gray-900 block truncate">Owner & Privacy Consent</span>
+                        <span className={`text-[10px] font-semibold block ${confirmAccurate && authorizeProfile && documentPrivacyConsent ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {confirmAccurate && authorizeProfile && documentPrivacyConsent ? 'Verified, Signed & Secured' : 'Pending Confirmation'}
                         </span>
                       </div>
                     </div>
@@ -3038,8 +3801,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                       <span className="text-xs text-gray-600">All required documents uploaded</span>
                     </li>
                     <li className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className={documentPrivacyConsent ? "text-emerald-500 mt-0.5 shrink-0" : "text-amber-500 mt-0.5 shrink-0"} />
+                      <span className="text-xs text-gray-600">Document Privacy & Security Consent Acknowledged</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
                       <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
                       <span className="text-xs text-gray-600">Website template selected</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <CheckCircle2 size={16} className={isPublished ? "text-emerald-500 mt-0.5 shrink-0" : "text-amber-500 mt-0.5 shrink-0"} />
+                      <span className="text-xs text-gray-600">
+                        Store Publish Status: <strong className={isPublished ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>{isPublished ? 'Published (Live)' : 'Unpublished (Draft)'}</strong>
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -3628,9 +4401,17 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-sm text-white">{shopName || 'Glow Beauty Parlour'}</h3>
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      LIVE WEBSITE PREVIEW
-                    </span>
+                    {isPublished ? (
+                      <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        ● PUBLISHED (LIVE)
+                      </span>
+                    ) : (
+                      <span className="bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        ○ UNPUBLISHED (DRAFT)
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-gray-400 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[12px]">link</span>
@@ -4145,6 +4926,62 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
           </div>
         </div>
       )}
+
+      {/* Document Expanded Preview Modal */}
+      <AnimatePresence>
+        {previewDocModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 bg-gray-900 text-white flex justify-between items-center shrink-0">
+                <div className="min-w-0 pr-4">
+                  <h3 className="text-sm font-bold truncate">{previewDocModal.typeLabel}</h3>
+                  <p className="text-[11px] text-gray-300 truncate">{previewDocModal.fileName} • {previewDocModal.fileSize}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocModal(null)}
+                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 bg-gray-950 flex-1 overflow-auto flex items-center justify-center min-h-[300px]">
+                {previewDocModal.isImage && previewDocModal.previewUrl ? (
+                  <img
+                    src={previewDocModal.previewUrl}
+                    alt={previewDocModal.typeLabel}
+                    className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-lg border border-gray-800"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="text-center p-8 bg-gray-900 rounded-2xl border border-gray-800 text-gray-200 space-y-3">
+                    <FileText size={48} className="mx-auto text-pink-400" />
+                    <h4 className="text-sm font-bold">{previewDocModal.fileName}</h4>
+                    <p className="text-xs text-gray-400">PDF Document Verified ({previewDocModal.fileSize})</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500 shrink-0">
+                <span>Uploaded: {previewDocModal.uploadedAt}</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocModal(null)}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-xl font-bold hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Close Preview
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
