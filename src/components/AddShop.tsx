@@ -104,6 +104,151 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   // Step 4 State: Website Setup & Branding
   const [websiteUrl, setWebsiteUrl] = useState('https://glowbeautyparlour.com');
   const [instagramHandle, setInstagramHandle] = useState('@glowbeauty_jaipur');
+  const [socialLinks, setSocialLinks] = useState({
+    facebook: 'https://facebook.com/glowbeautyjaipur',
+    instagram: 'https://instagram.com/glowbeauty_jaipur',
+    youtube: 'https://youtube.com/@glowbeautyjaipur',
+    linkedin: 'https://linkedin.com/company/glowbeautyjaipur',
+    twitter: 'https://x.com/glowbeautyjpr',
+    snapchat: 'https://snapchat.com/add/glowbeautyjpr',
+    googleBusiness: 'https://maps.app.goo.gl/glowbeautyjaipur',
+  });
+  const [customLinks, setCustomLinks] = useState<{ id: string; title: string; url: string }[]>([
+    { id: 'c1', title: 'Online Appointment Booking', url: 'https://booking.glowbeauty.com' }
+  ]);
+  const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
+
+  const validateSocialUrl = (platform: string, value: string): string => {
+    if (!value || !value.trim()) return '';
+    const val = value.trim().toLowerCase();
+
+    switch (platform) {
+      case 'facebook':
+        if (!val.includes('facebook.com') && !val.includes('fb.com') && !val.includes('fb.watch')) {
+          return 'Facebook link must contain facebook.com or fb.com';
+        }
+        break;
+      case 'instagram':
+        if (!val.includes('instagram.com') && !val.includes('instagr.am')) {
+          return 'Instagram link must contain instagram.com';
+        }
+        break;
+      case 'youtube':
+        if (!val.includes('youtube.com') && !val.includes('youtu.be')) {
+          return 'YouTube link must contain youtube.com or youtu.be';
+        }
+        break;
+      case 'linkedin':
+        if (!val.includes('linkedin.com')) {
+          return 'LinkedIn link must contain linkedin.com';
+        }
+        break;
+      case 'twitter':
+        if (!val.includes('x.com') && !val.includes('twitter.com')) {
+          return 'X / Twitter link must contain x.com or twitter.com';
+        }
+        break;
+      case 'snapchat':
+        if (!val.includes('snapchat.com')) {
+          return 'Snapchat link must contain snapchat.com';
+        }
+        break;
+      case 'googleBusiness':
+        if (!val.includes('google.com') && !val.includes('g.page') && !val.includes('goo.gl')) {
+          return 'Google Business link must contain google.com/maps, g.page, or goo.gl';
+        }
+        break;
+    }
+    return '';
+  };
+
+  const handleSocialChange = (platform: keyof typeof socialLinks, value: string) => {
+    setSocialLinks(prev => ({ ...prev, [platform]: value }));
+    const err = validateSocialUrl(String(platform), value);
+    setSocialErrors(prev => ({ ...prev, [platform]: err }));
+  };
+
+  const handleAddCustomLink = () => {
+    const newId = 'c_' + Date.now();
+    setCustomLinks(prev => [...prev, { id: newId, title: '', url: '' }]);
+  };
+
+  const handleRemoveCustomLink = (id: string) => {
+    setCustomLinks(prev => prev.filter(link => link.id !== id));
+  };
+
+  const handleCustomLinkChange = (id: string, field: 'title' | 'url', value: string) => {
+    setCustomLinks(prev => prev.map(link => link.id === id ? { ...link, [field]: value } : link));
+  };
+
+  const renderSocialIcon = (platform: string, className = "w-5 h-5") => {
+    switch (platform) {
+      case 'facebook':
+        return (
+          <svg className={`${className} text-[#1877F2] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        );
+      case 'instagram':
+        return (
+          <svg className={`${className} shrink-0`} viewBox="0 0 24 24">
+            <defs>
+              <linearGradient id={`ig-icon-${className.replace(/[^a-zA-Z0-9]/g, '-')}`} x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#fdf497" />
+                <stop offset="5%" stopColor="#fdf497" />
+                <stop offset="45%" stopColor="#fd5949" />
+                <stop offset="60%" stopColor="#d6249f" />
+                <stop offset="100%" stopColor="#285AEB" />
+              </linearGradient>
+            </defs>
+            <path fill={`url(#ig-icon-${className.replace(/[^a-zA-Z0-9]/g, '-')})`} d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+          </svg>
+        );
+      case 'youtube':
+        return (
+          <svg className={`${className} text-[#FF0000] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        );
+      case 'linkedin':
+        return (
+          <svg className={`${className} text-[#0A66C2] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.72a1.47 1.47 0 1 0 0 2.94 1.47 1.47 0 0 0 0-2.94z"/>
+          </svg>
+        );
+      case 'twitter':
+        return (
+          <svg className={`${className} text-gray-900 shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+        );
+      case 'snapchat':
+        return (
+          <svg className={`${className} text-[#FFFC00] bg-black p-0.5 rounded-md shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.162c-3.111 0-5.342 2.282-5.342 5.341 0 .783.181 1.543.518 2.227l-.626.241c-.496.192-.782.721-.684 1.255.093.504.509.882 1.018.927l.186.016a3.81 3.81 0 0 1-.72 1.206c-.521.603-1.258.986-2.036 1.058l-.208.019c-.394.037-.718.324-.78.718a.868.868 0 0 0 .341.876c.725.541 1.637.834 2.568.826.31 0 .622-.033.927-.099l.235.348c.552.818 1.42 1.385 2.42 1.58.552.108 1.118.163 1.685.163s1.133-.055 1.685-.163c1-.195 1.868-.762 2.42-1.58l.235-.348c.305.066.617.099.927.099.931.008 1.843-.285 2.568-.826a.868.868 0 0 0 .341-.876c-.062-.394-.386-.681-.78-.718l-.208-.019c-.778-.072-1.515-.455-2.036-1.058a3.81 3.81 0 0 1-.72-1.206l.186-.016c.509-.045.925-.423 1.018-.927.098-.534-.188-1.063-.684-1.255l-.626-.241c.337-.684.518-1.444.518-2.227 0-3.059-2.231-5.341-5.342-5.341z"/>
+          </svg>
+        );
+      case 'googleBusiness':
+        return (
+          <svg className={`${className} shrink-0`} viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+        );
+      case 'custom':
+      default:
+        return (
+          <svg className={`${className} text-indigo-600 shrink-0`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        );
+    }
+  };
+
   const [selectedTemplate, setSelectedTemplate] = useState('modern-salon');
   const [devState, setDevState] = useState<'default' | 'empty' | 'uploading' | 'error'>('default');
   const [coverPhoto, setCoverPhoto] = useState<string | null>('https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop');
@@ -144,6 +289,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoSuccess, setVideoSuccess] = useState<string | null>(null);
   const [videoUrlInput, setVideoUrlInput] = useState<string>('');
+  const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const interiorInputRef = useRef<HTMLInputElement | null>(null);
@@ -370,6 +517,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         if (parsed.annualTurnover !== undefined) setAnnualTurnover(parsed.annualTurnover);
         if (parsed.websiteUrl !== undefined) setWebsiteUrl(parsed.websiteUrl);
         if (parsed.instagramHandle !== undefined) setInstagramHandle(parsed.instagramHandle);
+        if (parsed.socialLinks !== undefined) setSocialLinks(parsed.socialLinks);
+        if (parsed.customLinks !== undefined) setCustomLinks(parsed.customLinks);
         if (parsed.panNumber !== undefined) setPanNumber(parsed.panNumber);
         if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep);
       }
@@ -403,6 +552,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         annualTurnover,
         websiteUrl,
         instagramHandle,
+        socialLinks,
+        customLinks,
         panNumber,
         currentStep,
         lastSaved: new Date().toISOString()
@@ -437,6 +588,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     annualTurnover,
     websiteUrl,
     instagramHandle,
+    socialLinks,
+    customLinks,
     panNumber,
     currentStep
   ]);
@@ -464,6 +617,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       annualTurnover,
       websiteUrl,
       instagramHandle,
+      socialLinks,
+      customLinks,
       panNumber,
       currentStep,
       lastSaved: new Date().toISOString()
@@ -1882,6 +2037,291 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   )}
                 </div>
               </section>
+
+              {/* Social Media & Online Links Section */}
+              <section className="bg-white rounded-[24px] p-6 border border-[#E8E8E8] shadow-sm flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-xl">share</span>
+                      <h3 className="text-xl font-bold text-gray-900">Social Media & Online Links</h3>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Add your official brand profiles and custom website links to showcase on your digital storefront.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                      {(Object.values(socialLinks) as string[]).filter(v => v.trim().length > 0).length + customLinks.filter(c => c.url.trim().length > 0).length} Links Connected
+                    </span>
+                  </div>
+                </div>
+
+                {/* Standard Social Platforms Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Facebook */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('facebook', 'w-4 h-4')}
+                        <span>Facebook (Profile / Page)</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">facebook.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('facebook', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.facebook}
+                        onChange={(e) => handleSocialChange('facebook', e.target.value)}
+                        placeholder="https://facebook.com/yourpage"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.facebook ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.facebook && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.facebook}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Instagram */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('instagram', 'w-4 h-4')}
+                        <span>Instagram</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">instagram.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('instagram', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.instagram}
+                        onChange={(e) => handleSocialChange('instagram', e.target.value)}
+                        placeholder="https://instagram.com/yourhandle"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.instagram ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.instagram && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.instagram}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* YouTube */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('youtube', 'w-4 h-4')}
+                        <span>YouTube</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">youtube.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('youtube', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.youtube}
+                        onChange={(e) => handleSocialChange('youtube', e.target.value)}
+                        placeholder="https://youtube.com/@yourchannel"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.youtube ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.youtube && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.youtube}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* LinkedIn */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('linkedin', 'w-4 h-4')}
+                        <span>LinkedIn</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">linkedin.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('linkedin', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.linkedin}
+                        onChange={(e) => handleSocialChange('linkedin', e.target.value)}
+                        placeholder="https://linkedin.com/company/yourcompany"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.linkedin ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.linkedin && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.linkedin}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* X (formerly Twitter) */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('twitter', 'w-4 h-4')}
+                        <span>X (formerly Twitter)</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">x.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('twitter', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.twitter}
+                        onChange={(e) => handleSocialChange('twitter', e.target.value)}
+                        placeholder="https://x.com/yourhandle"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.twitter ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.twitter && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.twitter}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Snapchat */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('snapchat', 'w-4 h-4')}
+                        <span>Snapchat</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">snapchat.com/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('snapchat', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.snapchat}
+                        onChange={(e) => handleSocialChange('snapchat', e.target.value)}
+                        placeholder="https://snapchat.com/add/yourusername"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.snapchat ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.snapchat && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.snapchat}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Google Business Profile */}
+                  <div className="flex flex-col gap-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        {renderSocialIcon('googleBusiness', 'w-4 h-4')}
+                        <span>Google Business Profile</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">maps.app.goo.gl/... or g.page/...</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 pointer-events-none flex items-center">
+                        {renderSocialIcon('googleBusiness', 'w-4 h-4')}
+                      </div>
+                      <input
+                        type="text"
+                        value={socialLinks.googleBusiness}
+                        onChange={(e) => handleSocialChange('googleBusiness', e.target.value)}
+                        placeholder="https://maps.app.goo.gl/yourbusiness or https://g.page/yourbusiness"
+                        className={`w-full pl-10 pr-3 py-2.5 bg-gray-50/80 border ${socialErrors.googleBusiness ? 'border-red-400 bg-red-50/30' : 'border-gray-200'} rounded-xl text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none`}
+                      />
+                    </div>
+                    {socialErrors.googleBusiness && (
+                      <span className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">error</span> {socialErrors.googleBusiness}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Other / Custom Website Links */}
+                <div className="border-t border-gray-100 pt-5 mt-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                        {renderSocialIcon('custom', 'w-4 h-4')}
+                        Other / Custom Website Links
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Add links to your online booking portal, digital menu, portfolio, blog, or external store.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomLink}
+                      className="px-3.5 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span> Add Custom Link
+                    </button>
+                  </div>
+
+                  {customLinks.length === 0 ? (
+                    <div className="p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 text-center text-xs text-gray-500">
+                      No custom web links added yet. Click "+ Add Custom Link" above to add your own website or booking URL.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customLinks.map((item) => (
+                        <div key={item.id} className="p-3 bg-gray-50/80 rounded-2xl border border-gray-200/80 flex flex-col sm:flex-row items-center gap-3">
+                          <div className="flex-1 w-full flex flex-col sm:flex-row gap-2">
+                            <div className="sm:w-1/3">
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1 uppercase tracking-wider">Link Title</label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => handleCustomLinkChange(item.id, 'title', e.target.value)}
+                                placeholder="e.g. Appointment Booking"
+                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                              />
+                            </div>
+                            <div className="sm:w-2/3">
+                              <label className="text-[10px] font-bold text-gray-500 block mb-1 uppercase tracking-wider">URL Link</label>
+                              <input
+                                type="text"
+                                value={item.url}
+                                onChange={(e) => handleCustomLinkChange(item.id, 'url', e.target.value)}
+                                placeholder="e.g. https://booking.yourbrand.com"
+                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomLink(item.id)}
+                            className="self-end sm:self-center w-8 h-8 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer"
+                            title="Remove custom link"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
             </div>
 
             {/* Right Column: Contextual Sidebar */}
@@ -1905,10 +2345,56 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                         <span className="text-[10px] font-semibold text-primary">Starting Price</span>
                         <span className="text-[12px] font-bold text-primary">₹300</span>
                       </div>
+
+                      {/* Connected Social Media Icons */}
+                      {((Object.values(socialLinks) as string[]).some(url => url.trim().length > 0) || customLinks.some(c => c.url.trim().length > 0)) && (
+                        <div className="mt-2.5 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+                          {socialLinks.facebook.trim() && (
+                            <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="Facebook">
+                              {renderSocialIcon('facebook', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.instagram.trim() && (
+                            <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="Instagram">
+                              {renderSocialIcon('instagram', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.youtube.trim() && (
+                            <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="YouTube">
+                              {renderSocialIcon('youtube', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.linkedin.trim() && (
+                            <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="LinkedIn">
+                              {renderSocialIcon('linkedin', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.twitter.trim() && (
+                            <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="X / Twitter">
+                              {renderSocialIcon('twitter', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.snapchat.trim() && (
+                            <a href={socialLinks.snapchat} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="Snapchat">
+                              {renderSocialIcon('snapchat', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {socialLinks.googleBusiness.trim() && (
+                            <a href={socialLinks.googleBusiness} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" title="Google Business Profile">
+                              {renderSocialIcon('googleBusiness', 'w-3.5 h-3.5')}
+                            </a>
+                          )}
+                          {customLinks.filter(c => c.url.trim().length > 0).map(c => (
+                            <a key={c.id} href={c.url.startsWith('http') ? c.url : `https://${c.url}`} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors" title={c.title || 'Custom Link'}>
+                              {renderSocialIcon('custom', 'w-3.5 h-3.5')}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-                <button onClick={() => alert(`Opening Full Preview for ${shopName}`)} className="w-full bg-primary text-white py-3 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors shadow-md flex items-center justify-center gap-2">
+                <button onClick={() => setIsFullPreviewOpen(true)} className="w-full bg-primary text-white py-3 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95">
                   <span className="material-symbols-outlined text-[18px]">open_in_new</span> Full Preview
                 </button>
               </div>
@@ -2396,6 +2882,54 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                               </div>
                             )}
                           </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[11px] font-semibold text-gray-400 block mb-1.5 uppercase tracking-wider">
+                          Social Media & Online Links ({(Object.values(socialLinks) as string[]).filter(v => v.trim().length > 0).length + customLinks.filter(c => c.url.trim().length > 0).length})
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {socialLinks.facebook.trim() && (
+                            <span className="px-2.5 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('facebook', 'w-3.5 h-3.5')} Facebook
+                            </span>
+                          )}
+                          {socialLinks.instagram.trim() && (
+                            <span className="px-2.5 py-1 bg-pink-50 border border-pink-100 text-pink-700 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('instagram', 'w-3.5 h-3.5')} Instagram
+                            </span>
+                          )}
+                          {socialLinks.youtube.trim() && (
+                            <span className="px-2.5 py-1 bg-red-50 border border-red-100 text-red-700 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('youtube', 'w-3.5 h-3.5')} YouTube
+                            </span>
+                          )}
+                          {socialLinks.linkedin.trim() && (
+                            <span className="px-2.5 py-1 bg-sky-50 border border-sky-100 text-sky-700 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('linkedin', 'w-3.5 h-3.5')} LinkedIn
+                            </span>
+                          )}
+                          {socialLinks.twitter.trim() && (
+                            <span className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-800 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('twitter', 'w-3.5 h-3.5')} X
+                            </span>
+                          )}
+                          {socialLinks.snapchat.trim() && (
+                            <span className="px-2.5 py-1 bg-amber-50 border border-amber-100 text-amber-800 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('snapchat', 'w-3.5 h-3.5')} Snapchat
+                            </span>
+                          )}
+                          {socialLinks.googleBusiness.trim() && (
+                            <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('googleBusiness', 'w-3.5 h-3.5')} Google Page
+                            </span>
+                          )}
+                          {customLinks.filter(c => c.url.trim().length > 0).map(c => (
+                            <span key={c.id} className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[11px] font-semibold flex items-center gap-1.5">
+                              {renderSocialIcon('custom', 'w-3.5 h-3.5')} {c.title || 'Custom Link'}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -3077,6 +3611,416 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 </button>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Website Full Preview Modal */}
+      <AnimatePresence>
+        {isFullPreviewOpen && (
+          <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex flex-col animate-fade-in">
+            {/* Top Control Bar */}
+            <div className="bg-gray-900 border-b border-gray-800 text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-[20px]">public</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm text-white">{shopName || 'Glow Beauty Parlour'}</h3>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      LIVE WEBSITE PREVIEW
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">link</span>
+                    {websiteUrl || 'https://glowbeautyparlour.com'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Device Selector */}
+              <div className="flex items-center bg-gray-800/80 p-1 rounded-xl border border-gray-700 mx-auto sm:mx-0">
+                <button 
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    previewDevice === 'mobile' 
+                      ? 'bg-primary text-white shadow-sm' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">smartphone</span>
+                  Mobile View
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    previewDevice === 'desktop' 
+                      ? 'bg-primary text-white shadow-sm' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
+                  Desktop View
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => window.open(websiteUrl || 'https://glowbeautyparlour.com', '_blank')}
+                  className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-gray-700 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  <span className="hidden sm:inline">Open in Tab</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setIsFullPreviewOpen(false)}
+                  className="w-9 h-9 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center transition-colors border border-gray-700 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Frame Container */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex items-center justify-center bg-gray-950/50">
+              <div className={`bg-white transition-all duration-300 overflow-hidden flex flex-col ${
+                previewDevice === 'mobile'
+                  ? 'w-full max-w-[400px] rounded-[38px] border-[10px] border-gray-900 shadow-2xl relative my-auto min-h-[720px] max-h-[85vh]'
+                  : 'w-full max-w-5xl rounded-2xl border border-gray-200 shadow-2xl my-auto min-h-[650px] max-h-[85vh]'
+              }`}>
+                {/* Mobile Phone Top Notch */}
+                {previewDevice === 'mobile' && (
+                  <div className="bg-gray-900 py-1.5 flex justify-center items-center shrink-0">
+                    <div className="w-20 h-4 bg-black rounded-full flex items-center justify-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-gray-800"></div>
+                      <div className="w-8 h-1 bg-gray-800 rounded-full"></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrollable Website Body */}
+                <div className="flex-1 overflow-y-auto no-scrollbar bg-white">
+                  {/* Shop Header / Hero */}
+                  <div className="relative bg-gray-900 text-white">
+                    <div className="h-44 sm:h-52 w-full relative overflow-hidden">
+                      <img 
+                        src={coverPhoto || (shopPhotos.length > 0 ? shopPhotos[0] : 'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop')} 
+                        alt="Cover" 
+                        className="w-full h-full object-cover opacity-80"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                      
+                      {/* Rating & Verified Badge */}
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                        <span className="bg-white/90 backdrop-blur text-gray-900 text-[11px] font-bold px-2.5 py-1 rounded-full shadow flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-amber-500 fill-1">star</span> 4.9 (128)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Logo & Main Info */}
+                    <div className="px-5 pb-5 -mt-10 relative z-10 flex flex-col gap-3">
+                      <div className="flex justify-between items-end">
+                        <div className="w-20 h-20 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden p-1 flex items-center justify-center">
+                          <img 
+                            src={shopLogo || 'https://images.unsplash.com/photo-1556760544-74068565f05c?q=80&w=200&auto=format&fit=crop'} 
+                            alt="Logo" 
+                            className="w-full h-full object-contain rounded-xl"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="px-3.5 py-1.5 bg-primary text-white rounded-xl text-xs font-bold shadow hover:bg-primary/90 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[16px]">calendar_today</span> Book
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h1 className="text-xl font-extrabold text-white">{shopName || 'Glow Beauty Parlour'}</h1>
+                          <span className="material-symbols-outlined text-primary text-[18px]" title="Verified Merchant">verified</span>
+                        </div>
+                        <p className="text-xs text-gray-300 mt-1 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-primary">location_on</span>
+                          {localityName || 'Mansarovar'}, {cityName || 'Jaipur'}, {stateName || 'Rajasthan'}
+                        </p>
+                      </div>
+
+                      {/* Tag Pills */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <span className="bg-white/10 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full backdrop-blur border border-white/10">
+                          {shopCategory || 'Beauty Parlour'}
+                        </span>
+                        <span className="bg-pink-500/20 text-pink-300 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-pink-500/30">
+                          For {businessGenderType || 'Women'}
+                        </span>
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                          {yearsInBusiness || '5'}+ Yrs Established
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Bar */}
+                  <div className="grid grid-cols-4 border-b border-gray-100 bg-gray-50/50 p-2 text-center text-xs">
+                    <button className="flex flex-col items-center py-2 text-gray-700 hover:text-primary transition-colors">
+                      <span className="material-symbols-outlined text-[20px] text-primary mb-0.5">call</span>
+                      <span className="text-[10px] font-bold">Call</span>
+                    </button>
+                    <button className="flex flex-col items-center py-2 text-gray-700 hover:text-emerald-600 transition-colors">
+                      <span className="material-symbols-outlined text-[20px] text-emerald-600 mb-0.5">chat</span>
+                      <span className="text-[10px] font-bold">WhatsApp</span>
+                    </button>
+                    <button className="flex flex-col items-center py-2 text-gray-700 hover:text-primary transition-colors">
+                      <span className="material-symbols-outlined text-[20px] text-blue-600 mb-0.5">near_me</span>
+                      <span className="text-[10px] font-bold">Directions</span>
+                    </button>
+                    <button className="flex flex-col items-center py-2 text-gray-700 hover:text-primary transition-colors">
+                      <span className="material-symbols-outlined text-[20px] text-purple-600 mb-0.5">share</span>
+                      <span className="text-[10px] font-bold">Share</span>
+                    </button>
+                  </div>
+
+                  {/* Main Preview Sections */}
+                  <div className="p-5 space-y-6">
+                    {/* About Section */}
+                    <div>
+                      <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-primary text-[18px]">info</span> About Us
+                      </h2>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {aboutShop || 'Welcome to our shop! We offer top quality beauty, hair care, and wellness services with certified staff and premium products.'}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                          <span className="text-[10px] text-gray-500 font-medium block">Starting Price</span>
+                          <span className="text-sm font-bold text-primary">₹{startingPrice || '300'}</span>
+                        </div>
+                        <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                          <span className="text-[10px] text-gray-500 font-medium block">Expert Staff</span>
+                          <span className="text-sm font-bold text-gray-800">{staffCount || '6'} Stylists</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Services & Price List */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-primary text-[18px]">spa</span> Popular Services
+                        </h2>
+                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                          {services.length} Services
+                        </span>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        {services.map((svc, idx) => (
+                          <div key={idx} className="p-3 bg-white border border-gray-150 rounded-xl flex items-center justify-between shadow-2xs hover:border-primary/40 transition-all">
+                            <div>
+                              <h3 className="text-xs font-bold text-gray-900">{svc.name}</h3>
+                              <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                <span className="material-symbols-outlined text-[12px]">schedule</span> {svc.duration}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-extrabold text-primary">₹{svc.price}</span>
+                              <button className="px-2.5 py-1 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg text-[11px] font-bold transition-all">
+                                Book
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Photo Gallery */}
+                    {(shopPhotos.length > 0 || interiorPhotos.length > 0) && (
+                      <div>
+                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-primary text-[18px]">photo_library</span> Photos Gallery
+                        </h2>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[...shopPhotos, ...interiorPhotos].slice(0, 6).map((img, idx) => (
+                            <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                              <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Video Highlights Gallery */}
+                    {videoHighlights.length > 0 && (
+                      <div>
+                        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-primary text-[18px]">smart_display</span> Video Highlights
+                        </h2>
+                        <div className="grid grid-cols-2 gap-3">
+                          {videoHighlights.map((vid, idx) => (
+                            <div key={idx} className="aspect-[9/16] rounded-xl overflow-hidden bg-black border border-gray-200 relative">
+                              {vid.startsWith('data:video') ? (
+                                <video src={vid} controls={false} autoPlay muted loop className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white">
+                                  <span className="material-symbols-outlined text-3xl">play_circle</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Business Hours & Location */}
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-3">
+                      <div>
+                        <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-primary text-[16px]">schedule</span> Opening Hours
+                        </h3>
+                        <p className="text-xs text-gray-700 mt-1 font-semibold">
+                          {openingTime || '10:00'} AM - {closingTime || '20:00'} PM
+                        </p>
+                        <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                          Closed on: <span className="font-bold">{weeklyOff || 'Tuesday'}</span>
+                        </p>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-2.5">
+                        <h3 className="text-xs font-bold text-gray-900 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-primary text-[16px]">place</span> Location & Address
+                        </h3>
+                        <p className="text-xs text-gray-700 mt-1">
+                          {fullAddress || '72, Madhyam Marg, Mansarovar, Jaipur'}
+                        </p>
+                        {landmark && (
+                          <p className="text-[11px] text-gray-500 mt-0.5">Landmark: {landmark}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Social Media & Online Links Section */}
+                    {((Object.values(socialLinks) as string[]).some(url => url.trim().length > 0) || customLinks.some(c => c.url.trim().length > 0)) && (
+                      <div className="bg-slate-900 text-white p-4.5 rounded-2xl shadow-sm space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-200 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-primary text-[16px]">share</span> Social Media & Online Links
+                          </h3>
+                          <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/40 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Verified
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {socialLinks.facebook.trim() && (
+                            <a 
+                              href={socialLinks.facebook} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-[#1877F2]/20 border border-slate-700/80 hover:border-[#1877F2] text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('facebook', 'w-4 h-4')}
+                              <span>Facebook</span>
+                            </a>
+                          )}
+                          {socialLinks.instagram.trim() && (
+                            <a 
+                              href={socialLinks.instagram} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-pink-500/20 border border-slate-700/80 hover:border-pink-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('instagram', 'w-4 h-4')}
+                              <span>Instagram</span>
+                            </a>
+                          )}
+                          {socialLinks.youtube.trim() && (
+                            <a 
+                              href={socialLinks.youtube} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-red-500/20 border border-slate-700/80 hover:border-red-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('youtube', 'w-4 h-4')}
+                              <span>YouTube</span>
+                            </a>
+                          )}
+                          {socialLinks.linkedin.trim() && (
+                            <a 
+                              href={socialLinks.linkedin} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-blue-600/20 border border-slate-700/80 hover:border-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('linkedin', 'w-4 h-4')}
+                              <span>LinkedIn</span>
+                            </a>
+                          )}
+                          {socialLinks.twitter.trim() && (
+                            <a 
+                              href={socialLinks.twitter} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('twitter', 'w-4 h-4')}
+                              <span>X (Twitter)</span>
+                            </a>
+                          )}
+                          {socialLinks.snapchat.trim() && (
+                            <a 
+                              href={socialLinks.snapchat} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-amber-400/20 border border-slate-700/80 hover:border-amber-400 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('snapchat', 'w-4 h-4')}
+                              <span>Snapchat</span>
+                            </a>
+                          )}
+                          {socialLinks.googleBusiness.trim() && (
+                            <a 
+                              href={socialLinks.googleBusiness} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800/90 hover:bg-emerald-500/20 border border-slate-700/80 hover:border-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('googleBusiness', 'w-4 h-4')}
+                              <span>Google Page</span>
+                            </a>
+                          )}
+                          {customLinks.filter(c => c.url.trim().length > 0).map(c => (
+                            <a 
+                              key={c.id}
+                              href={c.url.startsWith('http') ? c.url : `https://${c.url}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                              {renderSocialIcon('custom', 'w-4 h-4')}
+                              <span>{c.title || 'Custom Web Link'}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Website Footer */}
+                  <div className="p-4 bg-gray-900 text-center text-white text-[11px] border-t border-gray-800">
+                    <p className="font-semibold">{shopName || 'Glow Beauty Parlour'} © 2026</p>
+                    <p className="text-gray-400 text-[10px] mt-0.5">Powered by Local Merchant Digital Engine</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>
