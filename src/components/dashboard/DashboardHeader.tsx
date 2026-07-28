@@ -1,5 +1,6 @@
-import React from 'react';
-import { Bell, LogOut, WifiOff, Wifi, RefreshCw, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, LogOut, WifiOff, RefreshCw, CheckCircle2, Smartphone } from 'lucide-react';
+import InstallAppModal from '../InstallAppModal';
 
 function OfflineSyncStatus({ isOnline, isSyncing }: { isOnline: boolean; isSyncing: boolean }) {
   const statusBadgeStyle: React.CSSProperties = {
@@ -40,6 +41,7 @@ function OfflineSyncStatus({ isOnline, isSyncing }: { isOnline: boolean; isSynci
 
 export default function DashboardHeader({ onLogout, onNavigate, isOnline = true, isSyncing = false }: { onLogout: () => void, onNavigate?: (page: string) => void, isOnline?: boolean, isSyncing?: boolean }) {
   const [profileImage, setProfileImage] = React.useState<string | null>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     const saved = localStorage.getItem('nexora_partner_profile');
@@ -85,6 +87,13 @@ export default function DashboardHeader({ onLogout, onNavigate, isOnline = true,
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button 
+            onClick={() => setIsInstallModalOpen(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[#b90064] bg-[#fde7f3] hover:bg-pink-200 transition-colors cursor-pointer relative"
+            title="Install Nexora App"
+          >
+            <Smartphone size={18} />
+          </button>
+          <button 
             onClick={() => onNavigate?.('notifications')} 
             className="w-9 h-9 rounded-full flex items-center justify-center text-[#5a3f47] hover:bg-[#fde7f3] transition-colors cursor-pointer relative"
             title="Notifications"
@@ -110,6 +119,11 @@ export default function DashboardHeader({ onLogout, onNavigate, isOnline = true,
           </button>
         </div>
       </div>
+
+      <InstallAppModal 
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </header>
   );
 }

@@ -34,6 +34,7 @@ import {
   Eye
 } from 'lucide-react';
 import BottomNav from './BottomNav';
+import InstallAppModal from '../InstallAppModal';
 
 export default function ProfileScreen({
   onBack,
@@ -99,6 +100,7 @@ export default function ProfileScreen({
   const [isPauseOpen, setIsPauseOpen] = useState(false);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isKycOpen, setIsKycOpen] = useState(false);
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [kycDoc, setKycDoc] = useState<'pan' | 'aadhaar' | null>(null);
 
   // Local state for edit forms
@@ -376,6 +378,19 @@ export default function ProfileScreen({
 
             {/* Account Actions */}
             <section className="bg-white rounded-[18px] overflow-hidden shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 divide-y divide-gray-100">
+              <button 
+                onClick={() => setIsInstallOpen(true)} 
+                className="w-full p-4 flex items-center justify-between hover:bg-pink-50/50 transition-colors text-primary text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <Smartphone size={18} />
+                  <div>
+                    <span className="text-sm font-bold block">Install Nexora App</span>
+                    <span className="text-[10px] text-gray-500 block">Add to Home Screen (Auto-detects browser/OS)</span>
+                  </div>
+                </div>
+                <ChevronRight size={18} />
+              </button>
               <button 
                 onClick={() => setIsPauseOpen(true)} 
                 className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-[#ED6C02] text-left cursor-pointer"
@@ -1369,6 +1384,12 @@ export default function ProfileScreen({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Install App Modal */}
+      <InstallAppModal 
+        isOpen={isInstallOpen}
+        onClose={() => setIsInstallOpen(false)}
+      />
 
       {/* Navigation Footer */}
       <BottomNav onNavigate={onNavigate} currentPage="profile" />
