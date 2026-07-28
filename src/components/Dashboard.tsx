@@ -19,10 +19,19 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
   const [currentShops, setCurrentShops] = useState(250);
   const totalShops = 250;
   const [availableAmount, setAvailableAmount] = useState(8400);
+  const [partnerName, setPartnerName] = useState('Rahul Verma');
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        const savedProfile = localStorage.getItem('nexora_partner_profile');
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile);
+          if (parsed.name) {
+            setPartnerName(parsed.name);
+          }
+        }
+
         const cachedEarnings = await getItem<any>('earnings_data');
         if (cachedEarnings && cachedEarnings.availableAmount !== undefined) {
           setAvailableAmount(cachedEarnings.availableAmount);
@@ -44,11 +53,11 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
       <DashboardHeader onLogout={onLogout} onNavigate={onNavigate} isOnline={isOnline} isSyncing={isSyncing} />
       <main className="flex-1 w-full pt-4 pb-16 px-[--page-margin] max-w-screen-xl mx-auto space-y-5">
-        {/* Partner Header - Placeholder */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
+        {/* Partner Header */}
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 sm:px-6 py-1">
+            <div className="flex flex-col">
                 <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Growth Partner</p>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Rahul Verma</h2>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">{partnerName}</h2>
             </div>
         </section>
 

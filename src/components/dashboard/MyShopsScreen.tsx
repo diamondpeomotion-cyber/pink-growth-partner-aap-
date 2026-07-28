@@ -28,7 +28,13 @@ import {
   Smartphone,
   Sparkles,
   RefreshCw,
-  Phone
+  Phone,
+  Trash2,
+  Download,
+  Tag,
+  CheckSquare,
+  Square,
+  ListChecks
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -264,6 +270,12 @@ export default function MyShopsScreen({
   };
   const [selectedArea, setSelectedArea] = useState('');
   
+  // Bulk Selection States
+  const [selectedShopIds, setSelectedShopIds] = useState<string[]>([]);
+  const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
   // Interactive Modal States
   const [activeModal, setActiveModal] = useState<{
     type: 'progress' | 'issue' | 'qr' | 'status' | 'notifications';
@@ -335,6 +347,96 @@ export default function MyShopsScreen({
     setFilterDropdownOpen(false);
   };
 
+  // Bulk Selection Handlers
+  const isAllFilteredSelected = useMemo(() => {
+    if (filteredShops.length === 0) return false;
+    return filteredShops.every(s => selectedShopIds.includes(s.id));
+  }, [filteredShops, selectedShopIds]);
+
+  const toggleSelectAll = () => {
+    if (isAllFilteredSelected) {
+      const filteredIdsSet = new Set(filteredShops.map(s => s.id));
+      setSelectedShopIds(prev => prev.filter(id => !filteredIdsSet.has(id)));
+    } else {
+      const allFilteredIds = filteredShops.map(s => s.id);
+      setSelectedShopIds(prev => Array.from(new Set([...prev, ...allFilteredIds])));
+    }
+  };
+
+  const toggleSelectShop = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedShopIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    const count = selectedShopIds.length;
+    setShops(prev => prev.filter(s => !selectedShopIds.includes(s.id)));
+    setSelectedShopIds([]);
+    setShowBulkDeleteConfirm(false);
+    setToastMsg(`Successfully deleted ${count} shop(s).`);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  const handleExportCSV = () => {
+    const shopsToExport = shops.filter(s => selectedShopIds.includes(s.id));
+    if (shopsToExport.length === 0) return;
+
+    const headers = ['Shop ID', 'Shop Code', 'Shop Name', 'Owner Name', 'Mobile', 'Area', 'Status', 'Earnings (₹)'];
+    const rows = shopsToExport.map(s => [
+      `"${s.id}"`,
+      `"${s.code}"`,
+      `"${s.name.replace(/"/g, '""')}"`,
+      `"${s.ownerName.replace(/"/g, '""')}"`,
+      `"${s.mobile}"`,
+      `"${s.area.replace(/"/g, '""')}"`,
+      `"${s.status}"`,
+      s.earnings || 0
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Nexora_Bulk_Shops_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setToastMsg(`Exported ${shopsToExport.length} shop(s) to CSV successfully.`);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  const handleBulkStatusUpdate = (newStatus: Shop['status']) => {
+    const count = selectedShopIds.length;
+    setShops(prev => prev.map(s => {
+      if (selectedShopIds.includes(s.id)) {
+        let displayStat = newStatus as string;
+        if (newStatus === 'Passed') displayStat = 'Passed';
+        else if (newStatus === 'Daily Target Failed') displayStat = 'Failed';
+        else if (newStatus === 'Qualifying') displayStat = 'Qualifying';
+        else if (newStatus === 'QR Not Active') displayStat = 'Inactive';
+        else if (newStatus === 'Need Changes') displayStat = 'Needs Fix';
+        else if (newStatus === 'Under Review') displayStat = 'Reviewing';
+        
+        return {
+          ...s,
+          status: newStatus,
+          displayStatus: displayStat
+        };
+      }
+      return s;
+    }));
+
+    setSelectedShopIds([]);
+    setShowBulkStatusModal(false);
+    setToastMsg(`Updated status to "${newStatus}" for ${count} shop(s).`);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
       
@@ -379,6 +481,19 @@ export default function MyShopsScreen({
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-screen-xl mx-auto pt-4 pb-16 px-[--page-margin]">
         
+        {/* Toast Notification Banner */}
+        {toastMsg && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>{toastMsg}</span>
+            </div>
+            <button onClick={() => setToastMsg(null)} className="text-emerald-600 hover:text-emerald-900 p-1">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Title */}
         <div className="flex items-center justify-between mb-4 mt-2">
           <h2 className="text-xl font-black text-gray-900 tracking-tight">My Shops</h2>
@@ -545,6 +660,63 @@ export default function MyShopsScreen({
           </div>
         </div>
 
+        {/* Bulk Selection Header Bar */}
+        <div className="bg-white rounded-2xl p-3 mb-3 border border-gray-100 shadow-xs flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-xs font-extrabold text-gray-700 hover:text-primary transition-colors cursor-pointer py-1 px-2.5 rounded-xl bg-gray-50 hover:bg-pink-50/60 border border-gray-200/80 active:scale-95"
+            >
+              {isAllFilteredSelected ? (
+                <CheckSquare size={17} className="text-primary fill-pink-50" />
+              ) : (
+                <Square size={17} className="text-gray-400" />
+              )}
+              <span>{isAllFilteredSelected ? 'Deselect All' : 'Select All'}</span>
+              <span className="text-[10px] font-bold text-gray-400">({filteredShops.length})</span>
+            </button>
+
+            {selectedShopIds.length > 0 && (
+              <span className="bg-pink-100 text-primary text-[11px] font-black px-2.5 py-1 rounded-full border border-pink-200">
+                {selectedShopIds.length} Selected
+              </span>
+            )}
+          </div>
+
+          {selectedShopIds.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setShowBulkStatusModal(true)}
+                className="bg-pink-50 hover:bg-pink-100 text-primary border border-pink-100 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Update Status"
+              >
+                <Tag size={13} /> Status
+              </button>
+              <button
+                onClick={handleExportCSV}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Export CSV"
+              >
+                <Download size={13} /> Export
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                title="Delete Selected"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+              <button
+                onClick={() => setSelectedShopIds([])}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+                title="Clear selection"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Shop Cards List */}
         <div className="flex flex-col gap-4">
           {filteredShops.length === 0 ? (
@@ -564,6 +736,8 @@ export default function MyShopsScreen({
           ) : (
             <AnimatePresence mode="popLayout">
             {filteredShops.map((shop) => {
+              const isShopSelected = selectedShopIds.includes(shop.id);
+
               // Decide border and accent coloring based on status
               let accentColor = 'bg-emerald-500';
               let borderStyle = 'border-gray-200';
@@ -619,27 +793,44 @@ export default function MyShopsScreen({
                       handleArchive(shop.id);
                     }
                   }}
-                  className={`bg-white rounded-3xl p-4 shadow-sm border ${borderStyle} relative overflow-hidden hover:shadow-md h-full w-full`}
+                  className={`bg-white rounded-3xl p-4 shadow-sm border ${
+                    isShopSelected ? 'border-primary ring-2 ring-primary/40 bg-pink-50/10' : borderStyle
+                  } relative overflow-hidden hover:shadow-md h-full w-full transition-all`}
                 >
                   {/* Status Strip Accent */}
                   <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`}></div>
 
                   {/* Card Header */}
-                  <div className="flex justify-between items-start mb-3 ml-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="font-bold text-gray-900 text-sm tracking-tight">{shop.name}</h3>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${tagStyle}`}>
-                          {shop.displayStatus}
+                  <div className="flex items-start gap-2.5 mb-3 ml-1">
+                    {/* Checkbox button */}
+                    <button
+                      onClick={(e) => toggleSelectShop(shop.id, e)}
+                      className="mt-0.5 text-gray-400 hover:text-primary transition-colors cursor-pointer shrink-0 active:scale-90"
+                      aria-label="Select shop"
+                    >
+                      {isShopSelected ? (
+                        <CheckSquare size={20} className="text-primary fill-pink-50" />
+                      ) : (
+                        <Square size={20} className="text-gray-300 hover:text-gray-500" />
+                      )}
+                    </button>
+
+                    <div className="flex-1 flex justify-between items-start min-w-0">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-bold text-gray-900 text-sm tracking-tight">{shop.name}</h3>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${tagStyle}`}>
+                            {shop.displayStatus}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-gray-400 block tracking-wider">
+                          {shop.code} • {shop.area}
                         </span>
                       </div>
-                      <span className="text-[10px] font-semibold text-gray-400 block tracking-wider">
-                        {shop.code} • {shop.area}
+                      <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 shrink-0 ml-1">
+                        {shop.type}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 shrink-0">
-                      {shop.type}
-                    </span>
                   </div>
 
                   {/* Progress Block (15-Day Cycle) */}
@@ -794,8 +985,151 @@ export default function MyShopsScreen({
         <span className="text-xs font-extrabold tracking-tight">Add Shop</span>
       </button>
 
+      {/* Floating Bulk Action Bar */}
+      {selectedShopIds.length > 0 && (
+        <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg bg-gray-900/95 text-white backdrop-blur-md rounded-2xl p-3 shadow-2xl z-50 flex items-center justify-between border border-gray-800 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2.5 ml-2">
+            <span className="w-7 h-7 bg-primary text-white rounded-xl text-xs font-black flex items-center justify-center shadow-xs">
+              {selectedShopIds.length}
+            </span>
+            <span className="text-xs font-extrabold text-gray-200">Selected</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowBulkStatusModal(true)}
+              className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Tag size={14} className="text-pink-300" />
+              <span>Status</span>
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="bg-emerald-600/90 hover:bg-emerald-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Download size={14} />
+              <span>CSV</span>
+            </button>
+
+            <button
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              className="bg-red-600/90 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Trash2 size={14} />
+              <span>Delete</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedShopIds([])}
+              className="p-2 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              title="Cancel Selection"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Navigation */}
       <BottomNav onNavigate={onNavigate} currentPage="shops" />
+
+      {/* ================= BULK STATUS UPDATE MODAL ================= */}
+      {showBulkStatusModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => setShowBulkStatusModal(false)}
+          ></div>
+
+          <div className="relative bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl z-10 animate-in zoom-in-95 border border-gray-100">
+            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Tag size={18} className="text-primary" />
+                <h3 className="font-extrabold text-sm text-gray-900">Update Status</h3>
+              </div>
+              <button
+                onClick={() => setShowBulkStatusModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 my-3 font-medium">
+              Assign new status to <strong className="text-gray-900">{selectedShopIds.length}</strong> selected shop(s):
+            </p>
+
+            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
+              {[
+                { label: 'Qualifying', status: 'Qualifying' as Shop['status'], color: 'text-primary bg-pink-50 border-pink-100' },
+                { label: 'Passed', status: 'Passed' as Shop['status'], color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+                { label: 'Under Review', status: 'Under Review' as Shop['status'], color: 'text-blue-700 bg-blue-50 border-blue-100' },
+                { label: 'Need Changes', status: 'Need Changes' as Shop['status'], color: 'text-rose-700 bg-rose-50 border-rose-100' },
+                { label: 'KYC Pending', status: 'KYC Pending' as Shop['status'], color: 'text-amber-800 bg-amber-50 border-amber-100' },
+                { label: 'QR Not Active', status: 'QR Not Active' as Shop['status'], color: 'text-amber-700 bg-amber-50 border-amber-100' },
+                { label: 'Daily Target Failed', status: 'Daily Target Failed' as Shop['status'], color: 'text-red-700 bg-red-50 border-red-100' },
+                { label: 'Draft', status: 'Draft' as Shop['status'], color: 'text-gray-700 bg-gray-100 border-gray-200' },
+                { label: 'Rejected', status: 'Rejected' as Shop['status'], color: 'text-red-800 bg-red-100 border-red-200' }
+              ].map((opt) => (
+                <button
+                  key={opt.status}
+                  onClick={() => handleBulkStatusUpdate(opt.status)}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between hover:scale-[1.01] active:scale-98 cursor-pointer ${opt.color}`}
+                >
+                  <span>{opt.label}</span>
+                  <ChevronRight size={14} className="opacity-60" />
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowBulkStatusModal(false)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= BULK DELETE CONFIRM MODAL ================= */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            onClick={() => setShowBulkDeleteConfirm(false)}
+          ></div>
+
+          <div className="relative bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl z-10 animate-in zoom-in-95 border border-gray-100 text-center">
+            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Trash2 size={22} />
+            </div>
+
+            <h3 className="font-extrabold text-base text-gray-900">Delete {selectedShopIds.length} Shop(s)?</h3>
+            <p className="text-xs text-gray-500 mt-1 mb-5 leading-relaxed font-medium">
+              Are you sure you want to remove these selected shops? This action will remove them from your active workspace.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 h-11 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white h-11 rounded-xl text-xs font-bold transition-colors shadow-md shadow-red-200 cursor-pointer active:scale-95"
+              >
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= INTERACTIVE DETAIL MODALS ================= */}
       {activeModal && (

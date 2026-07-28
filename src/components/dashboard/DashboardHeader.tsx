@@ -2,9 +2,19 @@ import React from 'react';
 import { Bell, LogOut, WifiOff, Wifi, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 function OfflineSyncStatus({ isOnline, isSyncing }: { isOnline: boolean; isSyncing: boolean }) {
+  const statusBadgeStyle: React.CSSProperties = {
+    borderWidth: '3.25px',
+    textAlign: 'left',
+    lineHeight: '15px',
+    fontSize: '12px',
+    marginBottom: '-4px',
+    paddingRight: '9px',
+    paddingBottom: '4px',
+  };
+
   if (!isOnline) {
     return (
-      <div className="flex items-center gap-1.5 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+      <div style={statusBadgeStyle} className="flex items-center gap-1.5 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
         <WifiOff size={10} className="text-red-600" />
         <span className="text-[9px] font-bold text-red-600 uppercase tracking-wider">Offline Mode</span>
       </div>
@@ -13,7 +23,7 @@ function OfflineSyncStatus({ isOnline, isSyncing }: { isOnline: boolean; isSynci
 
   if (isSyncing) {
     return (
-      <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+      <div style={statusBadgeStyle} className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
         <RefreshCw size={10} className="text-amber-600 animate-spin" />
         <span className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">Syncing Data</span>
       </div>
@@ -21,7 +31,7 @@ function OfflineSyncStatus({ isOnline, isSyncing }: { isOnline: boolean; isSynci
   }
 
   return (
-    <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+    <div style={statusBadgeStyle} className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
       <CheckCircle2 size={10} className="text-emerald-600" />
       <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Synced</span>
     </div>
@@ -49,7 +59,26 @@ export default function DashboardHeader({ onLogout, onNavigate, isOnline = true,
     <header className="sticky top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs border-b border-gray-100">
       <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
         <div className="flex flex-col min-w-0 justify-center">
-          <h1 className="text-lg sm:text-xl font-bold text-[#b90064] cursor-pointer truncate leading-tight" onClick={() => onNavigate?.('dashboard')}>Nexora Growth</h1>
+          <h1 
+            style={{
+              width: '144.5px',
+              height: '29.4844px',
+              marginRight: '1px',
+              marginBottom: '-1px',
+              paddingRight: '0px',
+              paddingBottom: '0px',
+              textAlign: 'right',
+              lineHeight: '26.5px',
+              fontSize: '19px',
+              textDecorationLine: 'none',
+              fontStyle: 'normal',
+              fontWeight: 'bold',
+            }}
+            className="text-lg sm:text-xl font-bold text-[#b90064] cursor-pointer truncate leading-tight" 
+            onClick={() => onNavigate?.('dashboard')}
+          >
+            Nexora Growth
+          </h1>
           <div className="flex items-center h-5 mt-0.5">
             <OfflineSyncStatus isOnline={isOnline} isSyncing={isSyncing} />
           </div>
