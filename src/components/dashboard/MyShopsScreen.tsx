@@ -34,7 +34,12 @@ import {
   Tag,
   CheckSquare,
   Square,
-  ListChecks
+  ListChecks,
+  Store,
+  SearchX,
+  FilterX,
+  Building2,
+  PlusCircle
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -317,6 +322,7 @@ export default function MyShopsScreen({
         shop =>
           shop.name.toLowerCase().includes(q) ||
           shop.code.toLowerCase().includes(q) ||
+          (shop.id && shop.id.toLowerCase().includes(q)) ||
           shop.ownerName.toLowerCase().includes(q) ||
           shop.mobile.includes(q) ||
           shop.area.toLowerCase().includes(q)
@@ -494,13 +500,117 @@ export default function MyShopsScreen({
           </div>
         )}
 
-        {/* Title */}
-        <div className="flex items-center justify-between mb-4 mt-2">
+        {/* Title & Quick Stats */}
+        <div className="flex items-center justify-between mb-3 mt-2">
           <h2 className="text-xl font-black text-gray-900 tracking-tight">My Shops</h2>
           <span className="text-xs bg-emerald-50 border border-emerald-100 text-emerald-700 font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
             <CheckCircle2 size={13} className="text-emerald-500" />
             Verified
           </span>
+        </div>
+
+        {/* Top Search Bar */}
+        <div className="mb-4">
+          <div className="flex gap-2 relative">
+            <div className="relative flex-1">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                id="search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-12 pl-11 pr-10 bg-white rounded-2xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 font-medium text-xs text-gray-900 placeholder:text-gray-400 outline-none transition-all shadow-xs"
+                placeholder="Search by shop name, shop ID (e.g., RJ-JPR-001), owner..."
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            
+            <div className="relative">
+              <button
+                onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+                className={`h-12 w-12 flex items-center justify-center rounded-2xl border transition-all active:scale-95 cursor-pointer ${
+                  filterDropdownOpen 
+                    ? 'bg-primary border-primary text-white shadow-md' 
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+                title="Sort & Filter"
+              >
+                <SlidersHorizontal size={18} />
+                {(activeTab !== 'All' || selectedSort !== 'Newest First') && !filterDropdownOpen && (
+                  <span className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full"></span>
+                )}
+              </button>
+              
+              {/* Dropdown Menu */}
+              {filterDropdownOpen && (
+                <div className="absolute right-0 top-14 mt-1 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                    <h3 className="font-extrabold text-sm text-gray-900">Sort & Filter</h3>
+                    <button onClick={handleClearFilters} className="text-[10px] font-bold text-primary hover:underline cursor-pointer">Clear All</button>
+                  </div>
+                  
+                  <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div>
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Sort By</h4>
+                      <div className="flex flex-col gap-1">
+                        {['Newest First', 'Oldest First', 'Highest Earnings'].map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => { setSelectedSort(opt); setFilterDropdownOpen(false); }}
+                            className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              selectedSort === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Status</h4>
+                      <div className="flex flex-col gap-1">
+                        {['All', 'Qualifying', 'Under Review', 'Need Changes', 'KYC Pending', 'QR Not Active', 'Daily Target Failed'].map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => { setActiveTab(opt); setFilterDropdownOpen(false); }}
+                            className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex justify-between items-center cursor-pointer ${
+                              activeTab === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            <span>{opt === 'Qualifying' ? 'Active (Qualifying)' : opt === 'Under Review' ? 'Pending (Under Review)' : opt}</span>
+                            {activeTab === opt && <Check size={14} />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {searchQuery && (
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-500 font-medium px-1">
+              <span>
+                Found <strong className="text-gray-900">{filteredShops.length}</strong> shop{filteredShops.length === 1 ? '' : 's'} matching "{searchQuery}"
+              </span>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-primary hover:underline font-bold text-[11px] cursor-pointer"
+              >
+                Reset Search
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Summary Grid */}
@@ -530,92 +640,6 @@ export default function MyShopsScreen({
         <p className="text-[11px] text-gray-500 mb-5 text-center font-medium opacity-80">
           Only qualifying shops are counted towards rewards.
         </p>
-
-        {/* Search & Filter Dropdown */}
-        <div className="flex gap-2 mb-5 relative">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              id="search-input"
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-12 pl-11 pr-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-primary/20 font-medium text-xs text-gray-900 placeholder:text-gray-400 outline-none transition-all shadow-inner"
-              placeholder="Search shop, owner, mobile or area..."
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-gray-200/50 p-1 rounded-full transition-colors"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-          
-          <div className="relative">
-            <button
-              onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
-              className={`h-12 w-12 flex items-center justify-center rounded-2xl border transition-all active:scale-95 ${
-                filterDropdownOpen 
-                  ? 'bg-primary border-primary text-white shadow-md' 
-                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <SlidersHorizontal size={18} />
-              {(activeTab !== 'All' || selectedSort !== 'Newest First') && !filterDropdownOpen && (
-                <span className="absolute top-3 right-3 w-2 h-2 bg-primary rounded-full"></span>
-              )}
-            </button>
-            
-            {/* Dropdown Menu */}
-            {filterDropdownOpen && (
-              <div className="absolute right-0 top-14 mt-1 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                  <h3 className="font-extrabold text-sm text-gray-900">Sort & Filter</h3>
-                  <button onClick={handleClearFilters} className="text-[10px] font-bold text-primary hover:underline">Clear All</button>
-                </div>
-                
-                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div>
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Sort By</h4>
-                    <div className="flex flex-col gap-1">
-                      {['Newest First', 'Oldest First', 'Highest Earnings'].map(opt => (
-                        <button
-                          key={opt}
-                          onClick={() => { setSelectedSort(opt); setFilterDropdownOpen(false); }}
-                          className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                            selectedSort === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Status</h4>
-                    <div className="flex flex-col gap-1">
-                      {['All', 'Qualifying', 'Under Review', 'Need Changes', 'KYC Pending', 'QR Not Active', 'Daily Target Failed'].map(opt => (
-                        <button
-                          key={opt}
-                          onClick={() => { setActiveTab(opt); setFilterDropdownOpen(false); }}
-                          className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex justify-between items-center ${
-                            activeTab === opt ? 'bg-pink-50 text-primary' : 'hover:bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          <span>{opt === 'Qualifying' ? 'Active (Qualifying)' : opt === 'Under Review' ? 'Pending (Under Review)' : opt}</span>
-                          {activeTab === opt && <Check size={14} />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
         
         {/* Horizontal Scrollable Filter Tabs */}
         <div className="relative group/tabs mb-6 -mx-4">
@@ -720,19 +744,58 @@ export default function MyShopsScreen({
         {/* Shop Cards List */}
         <div className="flex flex-col gap-4">
           {filteredShops.length === 0 ? (
-            <div className="bg-white rounded-3xl p-8 border border-gray-100 text-center shadow-xs flex flex-col items-center">
-              <div className="w-14 h-14 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mb-3">
-                <Search size={24} />
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl p-8 sm:p-10 border border-gray-100 text-center shadow-xs flex flex-col items-center my-2 relative overflow-hidden"
+            >
+              {/* Decorative background blur glow */}
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-48 bg-pink-100/40 rounded-full blur-2xl pointer-events-none"></div>
+
+              {/* Professional Custom Illustration */}
+              <div className="relative mb-5 flex items-center justify-center">
+                <div className="w-20 h-20 bg-gradient-to-b from-pink-50 to-pink-100/60 text-primary rounded-3xl flex items-center justify-center shadow-xs border border-pink-100 transform -rotate-3 transition-transform hover:rotate-0">
+                  <Store size={38} className="text-primary stroke-[1.75]" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-9 h-9 bg-white text-gray-400 rounded-2xl flex items-center justify-center shadow-md border border-gray-100">
+                  <SearchX size={18} className="text-primary" />
+                </div>
               </div>
-              <h3 className="text-sm font-bold text-gray-900">No Shops Found</h3>
-              <p className="text-xs text-gray-500 mt-1 max-w-xs">No onboarded shops match your search parameters. Try adjusting filters.</p>
-              <button 
-                onClick={handleClearFilters}
-                className="mt-4 text-xs font-bold text-primary bg-pink-50 px-4 py-2 rounded-xl hover:bg-pink-100 transition-colors"
-              >
-                Clear All Filters
-              </button>
-            </div>
+
+              {/* Text Content */}
+              <h3 className="text-base font-extrabold text-gray-900 tracking-tight">No Shops Found</h3>
+              <p className="text-xs text-gray-500 mt-1.5 max-w-xs leading-relaxed font-medium">
+                {searchQuery || activeTab !== 'All' || selectedSort !== 'Newest First' ? (
+                  <>
+                    We couldn't find any onboarded shops matching{' '}
+                    {searchQuery ? <strong className="text-gray-900">"{searchQuery}"</strong> : 'your current filter settings'}.
+                  </>
+                ) : (
+                  'You haven\'t onboarded any partner shops yet. Onboard retail stores to start earning daily target commissions.'
+                )}
+              </p>
+
+              {/* Call To Action Buttons */}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 w-full max-w-xs">
+                <button
+                  onClick={() => onNavigate('add-shop')}
+                  className="flex-1 min-w-[130px] bg-primary hover:bg-[#a00056] text-white h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pink-200/50 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus size={16} className="stroke-[2.5]" />
+                  <span>Create New Shop</span>
+                </button>
+
+                {(searchQuery || activeTab !== 'All' || selectedSort !== 'Newest First') && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <RefreshCw size={14} />
+                    <span>Clear Filters</span>
+                  </button>
+                )}
+              </div>
+            </motion.div>
           ) : (
             <AnimatePresence mode="popLayout">
             {filteredShops.map((shop) => {
