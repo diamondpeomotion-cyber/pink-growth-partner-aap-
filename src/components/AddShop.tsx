@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import MapPreview from './MapPreview';
 import CancellationPolicyModal from './CancellationPolicyModal';
 import { 
@@ -66,7 +67,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
   // Step 2 State: Shop & Location Details
   const [shopName, setShopName] = useState('Glow Beauty Parlour');
-  const [shopCategory, setShopCategory] = useState('beauty_parlour');
+  const [shopCategory, setShopCategory] = useState('Beauty Parlour');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(true);
   
@@ -95,6 +96,10 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     { name: 'Hair Colour', price: '2,500', duration: '90 mins' },
   ]);
   const [aboutShop, setAboutShop] = useState('Glow Beauty Parlour offers professional beauty, hair and bridal services in Mansarovar, Jaipur.');
+  const [isAddingService, setIsAddingService] = useState(false);
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServicePrice, setNewServicePrice] = useState('');
+  const [newServiceDuration, setNewServiceDuration] = useState('');
 
   // Step 4 State: Website Setup & Branding
   const [websiteUrl, setWebsiteUrl] = useState('https://glowbeautyparlour.com');
@@ -108,6 +113,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     'https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=400&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1519699047748-de8e457a634e?q=80&w=400&auto=format&fit=crop'
   ]);
+  const [previewTemplate, setPreviewTemplate] = useState<{ id: string, name: string, img: string, desc: string } | null>(null);
 
   // Step 5 State: Documents
   const [panNumber, setPanNumber] = useState('ABCDE1234F');
@@ -130,6 +136,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   
+  const [isLogoGeneratorOpen, setIsLogoGeneratorOpen] = useState(false);
+  const [isCoverHelperOpen, setIsCoverHelperOpen] = useState(false);
+  const [interiorError, setInteriorError] = useState<string | null>(null);
+  const [videoHighlights, setVideoHighlights] = useState<string[]>([]);
+  const [isVideoHelperOpen, setIsVideoHelperOpen] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoSuccess, setVideoSuccess] = useState<string | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState<string>('');
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const interiorInputRef = useRef<HTMLInputElement | null>(null);
+  const videoUploadRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -141,6 +159,159 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     setSameAsMobile(checked);
     if (checked) {
       setWhatsappNumber(mobileNumber);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setShopLogo(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleInteriorUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const fileList = Array.from(files) as File[];
+      const MAX_PHOTOS = 10;
+      const MAX_SIZE_MB = 5;
+      const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+      // Check total count
+      if (interiorPhotos.length + fileList.length > MAX_PHOTOS) {
+        setInteriorError(`Maximum ${MAX_PHOTOS} photos allowed. You already have ${interiorPhotos.length}.`);
+        return;
+      }
+
+      // Check sizes
+      const oversizedFiles = fileList.filter(file => file.size > MAX_SIZE_BYTES);
+      if (oversizedFiles.length > 0) {
+        setInteriorError(`Some files exceed the ${MAX_SIZE_MB}MB size limit.`);
+        return;
+      }
+
+      setInteriorError(null);
+      fileList.forEach((file: File) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setInteriorPhotos(prev => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const MAX_VIDEOS = 5;
+      const MAX_SIZE_MB = 20;
+      const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+      const MAX_DURATION_SEC = 15;
+
+      if (videoHighlights.length >= MAX_VIDEOS) {
+        setVideoError(`Maximum ${MAX_VIDEOS} videos allowed.`);
+        return;
+      }
+
+      if (file.size > MAX_SIZE_BYTES) {
+        setVideoError(`Video file exceeds the ${MAX_SIZE_MB}MB size limit.`);
+        return;
+      }
+
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      videoElement.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(videoElement.src);
+        if (videoElement.duration > MAX_DURATION_SEC) {
+          setVideoError(`Video exceeds the ${MAX_DURATION_SEC} seconds limit.`);
+        } else {
+          setVideoError(null);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setVideoHighlights(prev => [...prev, reader.result as string]);
+            setVideoSuccess("Video highlight uploaded successfully!");
+            setTimeout(() => setVideoSuccess(null), 4000);
+            setIsVideoHelperOpen(false);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      videoElement.src = URL.createObjectURL(file);
+    }
+  };
+
+  const handleVideoLink = (url: string): boolean => {
+    if (!url || !url.trim()) {
+      setVideoError("Please enter a valid social media video link.");
+      return false;
+    }
+    const MAX_VIDEOS = 5;
+    if (videoHighlights.length >= MAX_VIDEOS) {
+      setVideoError(`Maximum ${MAX_VIDEOS} videos allowed.`);
+      return false;
+    }
+
+    // Basic URL validation for Instagram, YouTube, Facebook
+    const isValid = /instagram\.com\/(reels|reel|p)\/|youtube\.com\/(shorts|watch\?v=)|youtu\.be\/|facebook\.com\/(reels|reel|videos|watch)/i.test(url);
+    
+    if (isValid) {
+      // Parse for embeddable URL
+      let embedUrl = url;
+      const ytMatch = url.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|v=)([^&?/\s]+)/);
+      if (ytMatch) {
+        embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
+      } else {
+        const igMatch = url.match(/instagram\.com\/(?:reels|reel|p)\/([^&?/\s]+)/);
+        if (igMatch) {
+          embedUrl = `https://www.instagram.com/reels/${igMatch[1]}/embed`;
+        } else if (url.includes('facebook.com')) {
+          embedUrl = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}`;
+        }
+      }
+
+      // Check if duplicate link already exists in videoHighlights
+      if (videoHighlights.includes(embedUrl) || videoHighlights.includes(url)) {
+        setVideoError("This video link has already been added.");
+        return false;
+      }
+
+      setVideoError(null);
+      
+      setVideoHighlights(prev => [...prev, embedUrl]);
+      setVideoSuccess("Video highlight link added successfully!");
+      setTimeout(() => setVideoSuccess(null), 4000);
+      return true;
+    } else {
+      setVideoError("Invalid link format. Please paste a link from Instagram Reels, YouTube Shorts, or Facebook.");
+      return false;
+    }
+  };
+
+  const handleSaveVideoHighlight = () => {
+    if (!videoUrlInput.trim()) {
+      setVideoError("Please paste a social media video link or select a video file.");
+      return;
+    }
+    const success = handleVideoLink(videoUrlInput.trim());
+    if (success) {
+      setVideoUrlInput('');
+      setIsVideoHelperOpen(false);
     }
   };
 
@@ -738,12 +909,20 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                     onChange={(e) => setShopCategory(e.target.value)}
                     className="h-12 bg-gray-50 rounded-xl px-4 border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none text-sm font-medium text-gray-900"
                   >
-                    <option value="beauty_parlour">Beauty Parlour</option>
-                    <option value="salon">Unisex Salon</option>
-                    <option value="spa">Spa & Wellness</option>
-                    <option value="retail">Retail Store</option>
-                    <option value="barber">Barber Shop</option>
-                    <option value="other">Other Business</option>
+                    <option value="">Select Category</option>
+                    <option value="Barber Shop">Barber Shop</option>
+                    <option value="Beauty Parlour">Beauty Parlour</option>
+                    <option value="Unisex Salon">Unisex Salon</option>
+                    <option value="Nail Studio">Nail Studio</option>
+                    <option value="Spa & Wellness">Spa & Wellness</option>
+                    <option value="Tattoo & Piercing Studio">Tattoo & Piercing Studio</option>
+                    <option value="Massage Parlour">Massage Parlour</option>
+                    <option value="Hair & Makeup Studio">Hair & Makeup Studio</option>
+                    <option value="Skin Care & Aesthetics Clinic">Skin Care & Aesthetics Clinic</option>
+                    <option value="Bridal Studio">Bridal Studio</option>
+                    <option value="Eyelash & Brow Bar">Eyelash & Brow Bar</option>
+                    <option value="Retail & Cosmetic Store">Retail & Cosmetic Store</option>
+                    <option value="Other Business">Other Business</option>
                   </select>
                 </div>
               </div>
@@ -994,7 +1173,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 text-base">{shopName || 'Glow Beauty Parlour'}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Beauty Parlour • {localityName}, {cityName}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{shopCategory} • {localityName}, {cityName}</p>
                   <div className="flex items-center gap-1 mt-2 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full w-max text-xs font-medium">
                     <CheckCircle2 size={13} className="text-emerald-600" />
                     <span>Location Added</span>
@@ -1153,21 +1332,85 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                     </div>
                   </div>
                 ))}
+
+                {isAddingService && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gray-50 border border-primary/20 rounded-xl p-4 flex flex-col gap-3 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Service Name</label>
+                      <input 
+                        autoFocus
+                        type="text" 
+                        value={newServiceName}
+                        onChange={(e) => setNewServiceName(e.target.value)}
+                        placeholder="e.g. Haircut, Facial"
+                        className="h-10 bg-white border border-gray-200 rounded-lg px-3 text-sm focus:border-primary focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Price (₹)</label>
+                        <input 
+                          type="number" 
+                          value={newServicePrice}
+                          onChange={(e) => setNewServicePrice(e.target.value)}
+                          placeholder="500"
+                          className="h-10 bg-white border border-gray-200 rounded-lg px-3 text-sm focus:border-primary focus:outline-none transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Duration</label>
+                        <input 
+                          type="text" 
+                          value={newServiceDuration}
+                          onChange={(e) => setNewServiceDuration(e.target.value)}
+                          placeholder="30 mins"
+                          className="h-10 bg-white border border-gray-200 rounded-lg px-3 text-sm focus:border-primary focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                      <button 
+                        onClick={() => {
+                          if (newServiceName && newServicePrice) {
+                            setServices([...services, { 
+                              name: newServiceName, 
+                              price: newServicePrice, 
+                              duration: newServiceDuration || '30 mins' 
+                            }]);
+                            setNewServiceName('');
+                            setNewServicePrice('');
+                            setNewServiceDuration('');
+                            setIsAddingService(false);
+                          }
+                        }}
+                        className="flex-1 bg-primary text-white h-10 rounded-lg text-xs font-bold active:scale-95 transition-all"
+                      >
+                        Add Service
+                      </button>
+                      <button 
+                        onClick={() => setIsAddingService(false)}
+                        className="flex-1 bg-white border border-gray-200 text-gray-600 h-10 rounded-lg text-xs font-bold active:scale-95 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
-              <button 
-                type="button" 
-                onClick={() => {
-                  const name = prompt('Enter service name (e.g. Facial):');
-                  if (!name) return;
-                  const price = prompt('Enter price in ₹:', '500');
-                  const duration = prompt('Enter duration (e.g. 45 mins):', '45 mins');
-                  setServices([...services, { name, price: price || '500', duration: duration || '30 mins' }]);
-                }}
-                className="w-full py-3.5 border-2 border-dashed border-primary/30 rounded-xl flex items-center justify-center gap-2 text-primary text-xs font-semibold hover:bg-pink-50/50 transition-colors cursor-pointer"
-              >
-                <Plus size={16} /> Add Another Service
-              </button>
+              {!isAddingService && (
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddingService(true)}
+                  className="w-full py-3.5 border-2 border-dashed border-primary/30 rounded-xl flex items-center justify-center gap-2 text-primary text-xs font-bold hover:bg-pink-50/50 transition-all active:scale-95 cursor-pointer shadow-sm"
+                >
+                  <Plus size={16} /> Add Another Service
+                </button>
+              )}
               <p className="text-[11px] text-gray-400 text-center">The shop owner can add more services later.</p>
             </section>
 
@@ -1207,7 +1450,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                       <span className="material-symbols-outlined text-[16px]">location_on</span> {localityName || 'Mansarovar'}, {cityName || 'Jaipur'}
                     </p>
                     <div className="flex gap-2 mt-2">
-                      <span className="bg-pink-100 text-primary px-2 py-1 rounded-full text-xs font-semibold">Beauty Parlour</span>
+                      <span className="bg-pink-100 text-primary px-2 py-1 rounded-full text-xs font-semibold">{shopCategory}</span>
                       <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-semibold">3 Services Added</span>
                     </div>
                   </div>
@@ -1245,7 +1488,13 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                           <h4 className={`font-semibold text-[18px] ${isSelected ? 'text-primary' : 'text-gray-900'}`}>{tmpl.name}</h4>
                           <p className="text-xs text-gray-600 line-clamp-2">{tmpl.desc}</p>
                           <div className="flex gap-2 mt-2">
-                            <button onClick={() => alert(`Previewing ${tmpl.name}`)} className="flex-1 border border-primary text-primary py-2 rounded-xl text-sm font-medium hover:bg-pink-50 transition-colors">Preview</button>
+                            <button 
+                              type="button"
+                              onClick={() => setPreviewTemplate(tmpl)} 
+                              className="flex-1 border border-primary text-primary py-2 rounded-xl text-sm font-medium hover:bg-pink-50 transition-colors"
+                            >
+                              Preview
+                            </button>
                             <button 
                               onClick={() => setSelectedTemplate(tmpl.id)}
                               className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1 ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}
@@ -1274,50 +1523,126 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Shop Logo Card */}
                   <div className="bg-white rounded-[18px] p-4 border border-[#E8E8E8] shadow-sm flex flex-col gap-3">
+                    <input 
+                      type="file" 
+                      ref={logoInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleLogoUpload} 
+                    />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-semibold text-gray-900">Shop Logo</span>
-                      <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Uploaded
-                      </span>
+                      {shopLogo ? (
+                        <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Uploaded
+                        </span>
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">Missing</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-full border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center p-1 shrink-0">
-                        <img src={shopLogo || 'https://images.unsplash.com/photo-1556760544-74068565f05c?q=80&w=200&auto=format&fit=crop'} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                        {shopLogo ? (
+                          <img src={shopLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <span className="material-symbols-outlined text-gray-400 text-3xl">store</span>
+                        )}
                       </div>
                       <div className="flex-grow min-w-0">
-                        <p className="text-sm text-gray-900 truncate font-medium">glow-logo.png</p>
-                        <p className="text-xs text-gray-500 mt-0.5">1.2 MB</p>
+                        <p className="text-sm text-gray-900 truncate font-medium">{shopLogo ? 'logo-image.png' : 'No logo selected'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{shopLogo ? 'Custom Upload' : 'Upload shop branding'}</p>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-1">
-                      <button onClick={() => setShopLogo('https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=200&auto=format&fit=crop')} className="flex-1 bg-pink-50 text-primary py-2 rounded-xl text-sm font-medium flex justify-center items-center gap-1 hover:bg-pink-100 transition-colors">
-                        <span className="material-symbols-outlined text-[16px]">sync</span> Replace
+                      <button 
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()} 
+                        className="flex-1 bg-pink-50 text-primary py-2 rounded-xl text-sm font-bold flex justify-center items-center gap-1 hover:bg-pink-100 transition-all active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">upload</span> {shopLogo ? 'Replace' : 'Upload'}
                       </button>
-                      <button onClick={() => setShopLogo(null)} className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+                      {shopLogo && (
+                        <button 
+                          type="button"
+                          onClick={() => setShopLogo(null)} 
+                          className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition-all active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      )}
                     </div>
+                    
+                    <button 
+                      type="button"
+                      onClick={() => setIsLogoGeneratorOpen(true)}
+                      className="mt-1 py-2 rounded-xl border border-dashed border-primary/30 flex items-center justify-center gap-2 text-primary text-[11px] font-bold hover:bg-pink-50 transition-all active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                      Don't have a logo? Use AI Helper
+                    </button>
                   </div>
 
                   {/* Cover Photo Card */}
                   <div className="bg-white rounded-[18px] p-4 border border-[#E8E8E8] shadow-sm flex flex-col gap-3">
+                    <input 
+                      type="file" 
+                      ref={coverInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleCoverUpload} 
+                    />
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-semibold text-gray-900">Cover Photo</span>
-                      <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Uploaded
-                      </span>
+                      {coverPhoto ? (
+                        <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Uploaded
+                        </span>
+                      ) : (
+                        <span className="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">Missing</span>
+                      )}
                     </div>
                     <div className="h-20 rounded-lg border border-gray-200 overflow-hidden bg-gray-100 relative">
-                      <img src={coverPhoto || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop'} alt="Cover" className="w-full h-full object-cover" />
+                      {coverPhoto ? (
+                        <img src={coverPhoto} alt="Cover" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <span className="material-symbols-outlined text-3xl">image</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex justify-between items-center mt-1">
-                      <p className="text-sm text-gray-900 truncate pr-2 font-medium">glow-cover.jpg</p>
+                      <p className="text-sm text-gray-900 truncate pr-2 font-medium">{coverPhoto ? 'cover-image.jpg' : 'No cover photo'}</p>
                       <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => setCoverPhoto('https://images.unsplash.com/photo-1540555700478-4be289fbecef?q=80&w=800&auto=format&fit=crop')} className="text-primary text-xs font-semibold hover:underline">Replace</button>
-                        <span className="text-gray-300">|</span>
-                        <button onClick={() => setCoverPhoto(null)} className="text-red-600 text-xs font-semibold hover:underline">Remove</button>
+                        <button 
+                          type="button"
+                          onClick={() => coverInputRef.current?.click()} 
+                          className="text-primary text-xs font-bold hover:underline active:scale-95 transition-all"
+                        >
+                          {coverPhoto ? 'Replace' : 'Upload'}
+                        </button>
+                        {coverPhoto && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <button 
+                              type="button"
+                              onClick={() => setCoverPhoto(null)} 
+                              className="text-red-600 text-xs font-bold hover:underline active:scale-95 transition-all"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
+
+                    <button 
+                      type="button"
+                      onClick={() => setIsCoverHelperOpen(true)}
+                      className="mt-1 py-2 rounded-xl border border-dashed border-primary/30 flex items-center justify-center gap-2 text-primary text-[11px] font-bold hover:bg-pink-50 transition-all active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                      Don't have a cover? Use Templates
+                    </button>
                   </div>
                 </div>
               </section>
@@ -1327,35 +1652,234 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 <div className="flex justify-between items-end">
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">Interior Photos</h3>
-                    <p className="text-sm text-gray-600">Showcase your workspace to clients.</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-sm text-gray-600">Showcase your workspace to clients.</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${interiorPhotos.length >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {interiorPhotos.length} / 10 photos
+                      </span>
+                    </div>
                   </div>
-                  <button onClick={() => setInteriorPhotos([...interiorPhotos, 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?q=80&w=400&auto=format&fit=crop'])} className="bg-pink-50 text-primary px-3 py-1.5 rounded-xl text-sm font-medium flex items-center gap-1 hover:bg-pink-100 transition-colors">
+                  <input 
+                    type="file" 
+                    ref={interiorInputRef} 
+                    className="hidden" 
+                    multiple 
+                    accept="image/*" 
+                    onChange={handleInteriorUpload} 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => interiorInputRef.current?.click()} 
+                    disabled={interiorPhotos.length >= 10}
+                    className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                      interiorPhotos.length >= 10 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'bg-pink-50 text-primary hover:bg-pink-100 cursor-pointer'
+                    }`}
+                  >
                     <span className="material-symbols-outlined text-[18px]">add_a_photo</span> Add Photo
                   </button>
                 </div>
+
+                {interiorError && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-600 text-xs font-medium"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">error</span>
+                    {interiorError}
+                  </motion.div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {interiorPhotos.map((photo, idx) => (
-                    <div key={idx} className="bg-white rounded-[14px] border border-[#E8E8E8] overflow-hidden group relative">
-                      <div className="h-28 bg-gray-100 relative w-full">
+                    <div key={idx} className="bg-white rounded-[18px] border border-[#E8E8E8] overflow-hidden group relative shadow-sm">
+                      <div className="aspect-[4/3] bg-gray-100 relative w-full">
                         <img src={photo} alt={`Interior ${idx}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button onClick={() => alert('Viewing photo')} className="w-8 h-8 rounded-full bg-white/20 backdrop-blur text-white flex items-center justify-center hover:bg-white/40"><span className="material-symbols-outlined text-[16px]">visibility</span></button>
-                          <button onClick={() => setInteriorPhotos(interiorPhotos.filter((_, i) => i !== idx))} className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700"><span className="material-symbols-outlined text-[16px]">delete</span></button>
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <button 
+                            type="button"
+                            onClick={() => alert('Viewing photo')} 
+                            className="w-9 h-9 rounded-full bg-white/20 backdrop-blur text-white flex items-center justify-center hover:bg-white/40 transition-all active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">visibility</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setInteriorPhotos(interiorPhotos.filter((_, i) => i !== idx))} 
+                            className="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-all active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
                         </div>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs font-medium text-gray-900 truncate text-center">
+                      <div className="p-3 bg-white border-t border-gray-50">
+                        <p className="text-[11px] font-bold text-gray-900 truncate text-center uppercase tracking-wider">
                           {idx === 0 ? 'Reception Area' : idx === 1 ? 'Service Area' : idx === 2 ? 'Bridal Room' : `Workspace ${idx + 1}`}
                         </p>
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => setInteriorPhotos([...interiorPhotos, 'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=400&auto=format&fit=crop'])} className="bg-gray-50 rounded-[14px] border-2 border-dashed border-gray-300 h-[142px] flex flex-col items-center justify-center gap-2 hover:bg-pink-50/50 hover:border-primary/50 transition-colors group">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center text-gray-600 group-hover:text-primary transition-colors">
-                      <span className="material-symbols-outlined">add</span>
+                  <button 
+                    type="button"
+                    onClick={() => interiorInputRef.current?.click()} 
+                    disabled={interiorPhotos.length >= 10}
+                    className={`rounded-[18px] border-2 border-dashed aspect-[4/3] flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group ${
+                      interiorPhotos.length >= 10 
+                      ? 'bg-gray-50 border-gray-100 cursor-not-allowed opacity-60' 
+                      : 'bg-gray-50 border-gray-200 hover:bg-pink-50/50 hover:border-primary/50 cursor-pointer'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                      interiorPhotos.length >= 10 ? 'bg-gray-100 text-gray-300' : 'bg-gray-100 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary'
+                    }`}>
+                      <span className="material-symbols-outlined text-2xl">{interiorPhotos.length >= 10 ? 'block' : 'add'}</span>
                     </div>
-                    <span className="text-xs font-medium text-gray-600 group-hover:text-primary">Add More</span>
+                    <span className={`text-[11px] font-bold uppercase tracking-tighter ${
+                      interiorPhotos.length >= 10 ? 'text-gray-400' : 'text-gray-500 group-hover:text-primary'
+                    }`}>
+                      {interiorPhotos.length >= 10 ? 'Limit Reached' : 'Add More'}
+                    </span>
                   </button>
+                </div>
+              </section>
+
+              {/* Video Highlights Gallery */}
+              <section className="bg-white rounded-[24px] p-6 border border-[#E8E8E8] shadow-sm">
+                <div className="flex justify-between items-end mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Video Highlights</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-gray-600 leading-relaxed max-w-lg">Supports Facebook Reels links, YouTube Shorts links, and Instagram Reels/Story links, or direct video uploads (max 15s, 20MB).</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${videoHighlights.length >= 5 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {videoHighlights.length} / 5 videos
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input 
+                      type="file" 
+                      ref={videoUploadRef} 
+                      className="hidden" 
+                      accept="video/*" 
+                      onChange={handleVideoUpload} 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setIsVideoHelperOpen(true)}
+                      disabled={videoHighlights.length >= 5}
+                      className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                        videoHighlights.length >= 5 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">add_circle</span> Paste Link or Upload Video
+                    </button>
+                  </div>
+                </div>
+
+                {videoSuccess && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl flex items-center justify-between gap-2 text-emerald-800 text-xs font-semibold shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-[20px]">check_circle</span>
+                      <span>{videoSuccess}</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setVideoSuccess(null)}
+                      className="text-emerald-600 hover:text-emerald-800 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  </motion.div>
+                )}
+
+                {videoError && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-600 text-xs font-medium"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">error</span>
+                    {videoError}
+                  </motion.div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {videoHighlights.map((video, idx) => {
+                    const isDataUrl = video.startsWith('data:video');
+                    return (
+                      <div key={idx} className="bg-white rounded-[20px] border border-[#E8E8E8] overflow-hidden group relative shadow-sm aspect-[9/16] max-h-[350px] mx-auto w-full">
+                        {isDataUrl ? (
+                          <video src={video} className="w-full h-full object-cover" controls={false} muted loop autoPlay />
+                        ) : (
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center relative">
+                            <span className="material-symbols-outlined text-4xl text-gray-300">smart_display</span>
+                            <iframe 
+                              src={video.includes('youtube.com/embed') || video.includes('instagram.com/reels') ? video : undefined}
+                              className="absolute inset-0 w-full h-full pointer-events-none"
+                              title={`Video ${idx}`}
+                            />
+                            <div className="absolute top-2 left-2 bg-black/50 backdrop-blur px-2 py-1 rounded-lg flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px] text-white">link</span>
+                              <span className="text-[10px] text-white font-bold uppercase">Social Link</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <button 
+                            type="button"
+                            onClick={() => setVideoHighlights(videoHighlights.filter((_, i) => i !== idx))} 
+                            className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-all active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {videoHighlights.length < 5 && (
+                    <div className="bg-gray-50/80 rounded-[20px] border-2 border-dashed border-gray-200 aspect-[9/16] max-h-[350px] p-4 flex flex-col items-center justify-between text-center group hover:border-primary/50 transition-all">
+                      <div className="flex flex-col items-center gap-2 my-auto">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-primary/10 flex items-center justify-center text-gray-400 group-hover:text-primary transition-colors">
+                          <span className="material-symbols-outlined text-2xl text-primary">play_circle</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-800 group-hover:text-primary uppercase tracking-tight">
+                          Paste Link or Upload Video
+                        </span>
+                        <p className="text-[10px] text-gray-500 leading-tight max-w-[170px]">
+                          Paste Instagram, YouTube, or Facebook URL, or choose a file
+                        </p>
+                      </div>
+
+                      <div className="w-full flex flex-col gap-2 my-auto">
+                        <button 
+                          type="button"
+                          onClick={() => setIsVideoHelperOpen(true)}
+                          className="w-full py-2.5 px-3 bg-primary text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary/90 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">add_link</span>
+                          Paste Link or Upload Video
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => videoUploadRef.current?.click()}
+                          className="w-full py-2 px-3 bg-white border border-gray-200 text-gray-700 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-gray-100 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">upload_file</span>
+                          Select File (15s max)
+                        </button>
+                      </div>
+
+                      <span className="text-[9px] font-medium text-gray-400">Max 5 videos • Up to 20MB</span>
+                    </div>
+                  )}
                 </div>
               </section>
             </div>
@@ -1740,7 +2264,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                     <div>
                       <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Category</span>
                       <span className="text-sm font-bold text-gray-900 capitalize">
-                        {shopCategory ? shopCategory.replace('_', ' ') : 'Beauty Parlour'}
+                        {shopCategory}
                       </span>
                     </div>
                     <div className="md:col-span-2">
@@ -2106,6 +2630,456 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
       {/* Cancellation Policy Modal */}
       <CancellationPolicyModal isOpen={isPolicyModalOpen} onClose={() => setIsPolicyModalOpen(false)} />
+
+      <AnimatePresence>
+        {previewTemplate && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPreviewTemplate(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined">web</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">{previewTemplate.name}</h3>
+                    <p className="text-xs text-gray-500">Live Preview</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setPreviewTemplate(null)}
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Body: The Mock Website */}
+              <div className="flex-grow overflow-y-auto no-scrollbar p-6 bg-gray-50">
+                <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                  {/* Website Header */}
+                  <div className="h-48 bg-gray-200 relative">
+                    <img src={previewTemplate.img} alt={previewTemplate.name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-4 left-6 flex items-end gap-4">
+                      <div className="w-16 h-16 rounded-full bg-white p-1 shadow-lg">
+                        <img src={shopLogo || ''} alt="Logo" className="w-full h-full object-contain rounded-full" />
+                      </div>
+                      <div className="pb-1">
+                        <h4 className="text-xl font-bold text-white">{shopName}</h4>
+                        <p className="text-xs text-white/80">{shopCategory} • {localityName}, {cityName}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Website Content */}
+                  <div className="p-8">
+                    <div className="mb-8">
+                      <h5 className="text-lg font-bold text-gray-900 mb-2">Welcome to {shopName}</h5>
+                      <p className="text-sm text-gray-600 leading-relaxed">{previewTemplate.desc}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 mb-8">
+                      <h5 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Our Services</h5>
+                      {services.map((service, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-4 rounded-xl border border-gray-100 hover:border-primary/20 transition-colors">
+                          <div>
+                            <p className="font-bold text-gray-900">{service.name}</p>
+                            <p className="text-xs text-gray-500">{service.duration}</p>
+                          </div>
+                          <p className="font-bold text-primary">₹{service.price}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="bg-primary/5 rounded-2xl p-6 text-center border border-primary/10">
+                      <h5 className="font-bold text-gray-900 mb-1">Ready to book?</h5>
+                      <p className="text-xs text-gray-600 mb-4">Book your appointment in just a few clicks.</p>
+                      <button className="bg-primary text-white px-8 py-3 rounded-xl font-bold text-sm shadow-md shadow-primary/20">Book Now</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+                <button 
+                  onClick={() => setPreviewTemplate(null)}
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  Close
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedTemplate(previewTemplate.id);
+                    setPreviewTemplate(null);
+                  }}
+                  className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-primary/10"
+                >
+                  Apply Template
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Cover Photo Helper Modal */}
+      <AnimatePresence>
+        {isCoverHelperOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCoverHelperOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined">auto_awesome</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Cover Photo Helper</h3>
+                    <p className="text-xs text-gray-500">Choose a professional banner for your profile</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsCoverHelperOpen(false)}
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[70vh] no-scrollbar">
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="material-symbols-outlined text-primary text-sm">collections</span>
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Premium Templates (16:9)</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        { id: 'hair', label: 'Hair Salon & Barber', url: '/src/assets/images/hair_salon_cover_1785213611217.jpg', desc: 'Modern styling imagery with bold typography' },
+                        { id: 'beauty', label: 'Beauty Parlour', url: '/src/assets/images/beauty_parlour_cover_1785213627567.jpg', desc: 'Elegant makeup and skincare aesthetics' },
+                        { id: 'spa', label: 'Spa & Wellness', url: '/src/assets/images/spa_wellness_cover_1785213647098.jpg', desc: 'Calming visuals for relaxation services' },
+                        { id: 'tattoo', label: 'Tattoo & Piercing', url: '/src/assets/images/tattoo_studio_cover_1785213662029.jpg', desc: 'Edgy, stylized professional studio shots' },
+                        { id: 'nail', label: 'Nail Studio', url: '/src/assets/images/nail_studio_cover_1785213674923.jpg', desc: 'Vibrant and artistic manicure displays' }
+                      ].map((template) => (
+                        <button 
+                          key={template.id}
+                          onClick={() => {
+                            setCoverPhoto(template.url);
+                            setIsCoverHelperOpen(false);
+                          }}
+                          className="group flex flex-col rounded-2xl border border-gray-100 overflow-hidden hover:border-primary transition-all shadow-sm bg-gray-50/30"
+                        >
+                          <div className="aspect-video w-full relative">
+                            <img src={template.url} alt={template.label} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <span className="px-4 py-2 bg-primary text-white rounded-full text-xs font-bold shadow-lg">Use This Template</span>
+                            </div>
+                          </div>
+                          <div className="p-3 flex justify-between items-center bg-white">
+                            <div className="text-left">
+                              <p className="text-sm font-bold text-gray-900">{template.label}</p>
+                              <p className="text-[11px] text-gray-500">{template.desc}</p>
+                            </div>
+                            <span className="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity">check_circle</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+                    <div className="flex gap-3">
+                      <span className="material-symbols-outlined text-amber-600 text-lg">info</span>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        <span className="font-bold">Safe Zone Design:</span> These templates are designed with a central safe zone. Key information will remain visible even when cropped for mobile or tablet views.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-gray-100 bg-gray-50">
+                <button 
+                  onClick={() => setIsCoverHelperOpen(false)}
+                  className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 active:scale-95 transition-all hover:bg-gray-100"
+                >
+                  Close Helper
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Logo Generator Modal */}
+      <AnimatePresence>
+        {isLogoGeneratorOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsLogoGeneratorOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined">auto_awesome</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Logo Design Helper</h3>
+                    <p className="text-xs text-gray-500">Generate or create your shop logo</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsLogoGeneratorOpen(false)}
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[70vh] no-scrollbar">
+                {/* AI Suggestions */}
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary text-sm">stars</span>
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">AI Generated Concepts</h4>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 1, url: '/src/assets/images/logo_variation_1_1785212529747.jpg', label: 'Minimalist' },
+                      { id: 2, url: '/src/assets/images/logo_variation_2_1785212596463.jpg', label: 'Professional' },
+                      { id: 3, url: '/src/assets/images/logo_variation_3_1785212612276.jpg', label: 'Elegant' }
+                    ].map((logo) => (
+                      <button 
+                        key={logo.id}
+                        onClick={() => {
+                          setShopLogo(logo.url);
+                          setIsLogoGeneratorOpen(false);
+                        }}
+                        className="group relative aspect-square rounded-2xl overflow-hidden border-2 border-transparent hover:border-primary transition-all shadow-sm"
+                      >
+                        <img src={logo.url} alt={logo.label} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <span className="text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full">Apply</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-3 italic text-center">Click a concept above to use it instantly for your shop.</p>
+                </div>
+
+                {/* Free Design Tools */}
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary text-sm">construction</span>
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Free Logo Makers</h4>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { name: 'Canva Logo Maker', url: 'https://www.canva.com/create/logos/', icon: 'brush', desc: 'User-friendly drag & drop editor with 1000s of templates.' },
+                      { name: 'Looka AI', url: 'https://looka.com/', icon: 'bolt', desc: 'AI-powered logo generator that learns your style preferences.' },
+                      { name: 'Hatchful by Shopify', url: 'https://hatchful.shopify.com/', icon: 'shopping_bag', desc: 'Professional logos tailored for retail and beauty businesses.' }
+                    ].map((tool) => (
+                      <a 
+                        key={tool.name}
+                        href={tool.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-primary/20 hover:bg-pink-50/30 transition-all group"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-white group-hover:text-primary transition-colors">
+                          <span className="material-symbols-outlined">{tool.icon}</span>
+                        </div>
+                        <div className="flex-grow">
+                          <h5 className="text-sm font-bold text-gray-900">{tool.name}</h5>
+                          <p className="text-[11px] text-gray-500">{tool.desc}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-300 group-hover:text-primary transition-colors">open_in_new</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-gray-100 bg-gray-50 flex flex-col gap-3">
+                <p className="text-[11px] text-gray-500 text-center px-4">
+                  These tools are third-party services. Once you create a logo, download it and use the <span className="font-bold">Upload</span> button in the registration form.
+                </p>
+                <button 
+                  onClick={() => setIsLogoGeneratorOpen(false)}
+                  className="w-full py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 active:scale-95 transition-all"
+                >
+                  Close Helper
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Video Highlights Helper Modal */}
+      <AnimatePresence>
+        {isVideoHelperOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsVideoHelperOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined">play_circle</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Add Video Highlight</h3>
+                    <p className="text-xs text-gray-500">Showcase your shop in action</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsVideoHelperOpen(false)}
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {videoError && (
+                  <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">error</span>
+                    <span>{videoError}</span>
+                  </div>
+                )}
+
+                {/* Method 1: Paste Link */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="material-symbols-outlined text-primary text-sm">link</span>
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Social Media Link</h4>
+                  </div>
+                  <div className="flex flex-col gap-2.5">
+                    <p className="text-[11px] text-gray-500">Supported: Facebook Reels, YouTube Shorts, Instagram Reels/Stories</p>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        value={videoUrlInput}
+                        onChange={(e) => {
+                          setVideoUrlInput(e.target.value);
+                          if (videoError) setVideoError(null);
+                        }}
+                        placeholder="Paste video URL here (e.g. https://instagram.com/reel/...)"
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveVideoHighlight();
+                          }
+                        }}
+                      />
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">add_link</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold text-gray-400">
+                    <span className="bg-white px-4">Or</span>
+                  </div>
+                </div>
+
+                {/* Method 2: Direct Upload */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="material-symbols-outlined text-primary text-sm">cloud_upload</span>
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Direct Video Upload</h4>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      videoUploadRef.current?.click();
+                    }}
+                    className="w-full py-6 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50 flex flex-col items-center justify-center gap-2 group hover:bg-primary/5 hover:border-primary/30 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <div className="w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 group-hover:text-primary transition-colors">
+                      <span className="material-symbols-outlined text-xl">video_file</span>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-gray-900">Choose Video File</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">Max 15s duration • Max 20MB file size • MP4, MOV</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsVideoHelperOpen(false);
+                    setVideoError(null);
+                    setVideoUrlInput('');
+                  }}
+                  className="px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 active:scale-95 transition-all hover:bg-gray-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleSaveVideoHighlight}
+                  className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:bg-primary/90 transition-all active:scale-95 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">play_circle</span>
+                  Save Video Highlight
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Live Camera Viewfinder Modal */}
       {isCameraOpen && (

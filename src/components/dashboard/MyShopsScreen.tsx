@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getItem, setItem } from '../../utils/db';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Plus,
   ChevronRight,
+  ChevronLeft,
   Info,
   Calendar,
   DollarSign,
@@ -188,6 +189,41 @@ export default function MyShopsScreen({
 }) {
   const [shops, setShops] = useState<Shop[]>(INITIAL_SHOPS);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
+  
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
+
+  const handleTabsScroll = () => {
+    if (tabsScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsScrollRef.current;
+      setShowLeftArrow(scrollLeft > 10);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsScrollRef.current) {
+      const scrollAmount = 200;
+      tabsScrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const el = tabsScrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', handleTabsScroll);
+      handleTabsScroll();
+      window.addEventListener('resize', handleTabsScroll);
+      return () => {
+        el.removeEventListener('scroll', handleTabsScroll);
+        window.removeEventListener('resize', handleTabsScroll);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOfflineMode(false);
@@ -466,25 +502,47 @@ export default function MyShopsScreen({
           </div>
         </div>
         
-        {/* Horizontal Scrollable Filter Tabs (Keep for quick access, or remove if redundant, let's keep them as requested, but the dropdown now exists) */}
+        {/* Horizontal Scrollable Filter Tabs */}
+        <div className="relative group/tabs mb-6 -mx-4">
+          {showLeftArrow && (
+            <button 
+              onClick={() => scrollTabs('left')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-r from-[#fcf9f8] via-[#fcf9f8]/80 to-transparent flex items-center justify-start pl-4 text-primary transition-opacity"
+            >
+              <ChevronLeft size={16} strokeWidth={3} />
+            </button>
+          )}
 
-        <div className="flex overflow-x-auto no-scrollbar gap-2 mb-6 -mx-4 px-4 snap-x">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.value;
-            return (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={`snap-start flex-shrink-0 px-4 py-2 rounded-full font-bold text-xs border whitespace-nowrap active:scale-95 transition-all shadow-xs ${
-                  isActive
-                    ? 'bg-primary text-white border-primary shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'
-                }`}
-              >
-                {tab.label} ({tab.count})
-              </button>
-            );
-          })}
+          {showRightArrow && (
+            <button 
+              onClick={() => scrollTabs('right')}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-l from-[#fcf9f8] via-[#fcf9f8]/80 to-transparent flex items-center justify-end pr-4 text-primary transition-opacity"
+            >
+              <ChevronRight size={16} strokeWidth={3} />
+            </button>
+          )}
+
+          <div 
+            ref={tabsScrollRef}
+            className="flex overflow-x-auto no-scrollbar gap-2 px-4 snap-x scroll-smooth"
+          >
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  className={`snap-start flex-shrink-0 px-4 py-2 rounded-full font-bold text-xs border whitespace-nowrap active:scale-95 transition-all shadow-xs ${
+                    isActive
+                      ? 'bg-primary text-white border-primary shadow-sm'
+                      : 'bg-white text-gray-600 border-gray-100 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Shop Cards List */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -10,7 +10,9 @@ import {
   Clock,
   CheckCircle2,
   Bell,
-  Archive
+  Archive,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -70,6 +72,40 @@ interface NotificationsScreenProps {
 export default function NotificationsScreen({ onBack, onNavigate }: NotificationsScreenProps) {
   const [activeFilter, setActiveFilter] = useState('All');
   const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setShowLeftArrow(scrollLeft > 10);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', handleScroll);
+      handleScroll();
+      window.addEventListener('resize', handleScroll);
+      return () => {
+        el.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleScroll);
+      };
+    }
+  }, []);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const scrollAmount = 200;
+      scrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const handleArchive = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -116,20 +152,43 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
         </div>
 
         {/* Filter Tabs */}
-        <div className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-3 flex gap-2.5 border-t border-gray-50">
-          {FILTERS.map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${
-                activeFilter === filter 
-                  ? 'bg-[#b90064] text-white shadow-md shadow-pink-100' 
-                  : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'
-              }`}
+        <div className="relative group/tabs border-t border-gray-50">
+          {showLeftArrow && (
+            <button 
+              onClick={() => scroll('left')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-1 text-[#b90064] transition-opacity"
             >
-              {filter}
+              <ChevronLeft size={16} strokeWidth={3} />
             </button>
-          ))}
+          )}
+
+          {showRightArrow && (
+            <button 
+              onClick={() => scroll('right')}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-full bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-1 text-[#b90064] transition-opacity"
+            >
+              <ChevronRight size={16} strokeWidth={3} />
+            </button>
+          )}
+
+          <div 
+            ref={scrollRef}
+            className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-3 flex gap-2.5 scroll-smooth"
+          >
+            {FILTERS.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${
+                  activeFilter === filter 
+                    ? 'bg-[#b90064] text-white shadow-md shadow-pink-100' 
+                    : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 

@@ -1,7 +1,11 @@
-import React from 'react';
-import { PlusCircle, Store, Wallet, Gift, Share2 } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { PlusCircle, Store, Wallet, Gift, Share2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function QuickActions({ onNavigate }: { onNavigate?: (page: string) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
+
   const actions = [
     { icon: PlusCircle, label: 'Add Shop', color: '#b90064', page: 'add-shop' },
     { icon: Store, label: 'My Shops', color: '#0052da', page: 'shops' },
@@ -10,10 +14,63 @@ export default function QuickActions({ onNavigate }: { onNavigate?: (page: strin
     { icon: Share2, label: 'Share Referral', color: '#b80663', page: 'profile' },
   ];
 
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setShowLeftArrow(scrollLeft > 10);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', handleScroll);
+      handleScroll();
+      window.addEventListener('resize', handleScroll);
+      return () => {
+        el.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleScroll);
+      };
+    }
+  }, []);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const scrollAmount = 160;
+      scrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
-    <section className="-mx-5 px-5">
+    <section className="-mx-5 px-5 relative group">
       <h3 className="text-xl font-semibold text-[#1b1c1b] mb-4 px-1">Quick Actions</h3>
-      <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth">
+      
+      {showLeftArrow && (
+        <button 
+          onClick={() => scroll('left')}
+          className="absolute left-2 top-[calc(50%+12px)] -translate-y-1/2 z-10 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-primary border border-gray-100 hover:bg-white transition-all active:scale-90"
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
+
+      {showRightArrow && (
+        <button 
+          onClick={() => scroll('right')}
+          className="absolute right-2 top-[calc(50%+12px)] -translate-y-1/2 z-10 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-primary border border-gray-100 hover:bg-white transition-all active:scale-90"
+        >
+          <ChevronRight size={18} />
+        </button>
+      )}
+
+      <div 
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory scroll-smooth"
+      >
         {actions.map((action, idx) => (
           <button 
             key={idx} 
