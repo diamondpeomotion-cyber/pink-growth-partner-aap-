@@ -22,6 +22,28 @@ import TicketDetailsScreen from './components/dashboard/TicketDetailsScreen';
 import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import NotificationsScreen from './components/dashboard/NotificationsScreen';
+import OfflineNotificationBanner from './components/OfflineNotificationBanner';
+
+export const DEFAULT_PARTNER_PROFILE = {
+  name: 'Rahul Verma',
+  mobile: '9876543210',
+  email: 'rahul.verma@nexoragrowth.in',
+  agentCode: 'NX-RJ-8842',
+  city: 'Jaipur, Rajasthan',
+  upiId: 'rahulverma@okaxis',
+  joinedDate: '15 Jan 2024',
+  status: 'Active Partner'
+};
+
+export const DEFAULT_DASHBOARD_CACHE = {
+  availableAmount: 8400,
+  qualifyingShopsCount: 250,
+  totalShopsCount: 250,
+  monthlyEarnings: 42500,
+  pendingPayouts: 1800,
+  lastSyncTime: new Date().toISOString(),
+  offlinePendingActionsCount: 0,
+};
 
 export default function App() {
   const swipeRef = useRef<HTMLDivElement>(null);
@@ -34,13 +56,45 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
+  // Initialize persistent storage layer in localStorage
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('nexora_partner_profile')) {
+        localStorage.setItem('nexora_partner_profile', JSON.stringify(DEFAULT_PARTNER_PROFILE));
+      }
+      if (!localStorage.getItem('nexora_dashboard_cache')) {
+        localStorage.setItem('nexora_dashboard_cache', JSON.stringify(DEFAULT_DASHBOARD_CACHE));
+      }
+    } catch (err) {
+      console.warn('Unable to access localStorage for persistent user cache:', err);
+    }
+  }, []);
+
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setIsSyncing(true);
+      
+      // Update persistent storage cache on online sync
+      try {
+        const cache = localStorage.getItem('nexora_dashboard_cache');
+        const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
+        const updatedCache = {
+          ...parsedCache,
+          lastSyncTime: new Date().toISOString(),
+        };
+        localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
+        localStorage.setItem('nexora_last_sync_timestamp', new Date().toISOString());
+      } catch (e) {
+        console.error('Failed updating cache on network status change:', e);
+      }
+
       setTimeout(() => setIsSyncing(false), 2000);
     };
-    const handleOffline = () => setIsOnline(false);
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -49,6 +103,17 @@ export default function App() {
     channel.onmessage = (event) => {
       if (event.data && event.data.type === 'SYNC_COMPLETE') {
         setIsSyncing(false);
+        try {
+          const cache = localStorage.getItem('nexora_dashboard_cache');
+          const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
+          const updatedCache = {
+            ...parsedCache,
+            lastSyncTime: new Date().toISOString(),
+          };
+          localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
+        } catch (e) {
+          console.error('Failed syncing cache on broadcast:', e);
+        }
       }
     };
 
@@ -251,6 +316,7 @@ export default function App() {
 
   return (
     <div ref={swipeRef} className="h-screen max-h-screen w-full flex flex-col bg-[#fcf9f8] overflow-hidden">
+      <OfflineNotificationBanner isOnline={isOnline} />
       {currentPage !== 'dashboard' && (
         <div className="fixed top-0 left-0 z-[100] p-4 pointer-events-none">
           <button 

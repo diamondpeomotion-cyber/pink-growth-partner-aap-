@@ -10,7 +10,12 @@ import {
   ChevronRight,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Database,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 export default function AccountSettingsScreen({ onBack }: { onBack: () => void }) {
@@ -39,6 +44,8 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [showClearCacheConfirm, setShowClearCacheConfirm] = useState(false);
+  const [cacheClearedMsg, setCacheClearedMsg] = useState<string | null>(null);
   
   const [notifPreferences, setNotifPreferences] = useState({
     email: true,
@@ -52,6 +59,25 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
     localStorage.setItem('nexora_partner_profile', JSON.stringify(profile));
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleClearCache = () => {
+    try {
+      localStorage.removeItem('nexora_dashboard_cache');
+      localStorage.removeItem('nexora_last_sync_timestamp');
+      localStorage.removeItem('simulatedQualifyingCount');
+      localStorage.removeItem('add_shop_form_draft');
+      localStorage.removeItem('store_is_published');
+      
+      setCacheClearedMsg('Cache reset successfully! Fetching fresh remote data...');
+      setShowClearCacheConfirm(false);
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (e) {
+      console.error('Failed clearing cache:', e);
+    }
   };
 
   const handleUpdatePassword = () => {
@@ -305,6 +331,84 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
             ))}
           </div>
         </div>
+
+        {/* Data Storage & Cache Management */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <div className="flex items-center gap-3 pb-2 border-b border-gray-50">
+            <div className="p-2 bg-purple-50 rounded-lg">
+              <Database size={20} className="text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">Data Storage & Offline Cache</h3>
+              <p className="text-xs text-gray-500">Manage offline cached data and force remote server synchronization</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <p className="text-xs font-bold text-gray-900">Reset Local Storage Cache</p>
+              <p className="text-[11px] text-gray-500">Clears offline shop tallies, draft registrations, and sync timestamps to force a fresh fetch from the server.</p>
+            </div>
+            <button
+              onClick={() => setShowClearCacheConfirm(true)}
+              className="bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Trash2 size={14} /> Clear Cache
+            </button>
+          </div>
+
+          {cacheClearedMsg && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>{cacheClearedMsg}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Clear Cache Confirmation Dialog */}
+        {showClearCacheConfirm && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              onClick={() => setShowClearCacheConfirm(false)}
+            ></div>
+
+            <div className="relative bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl z-10 border border-gray-100 animate-in zoom-in-95">
+              <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={18} className="text-amber-500" />
+                  <h3 className="font-extrabold text-sm text-gray-900">Clear Local Cache?</h3>
+                </div>
+                <button
+                  onClick={() => setShowClearCacheConfirm(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="my-4 text-xs text-gray-600 space-y-2">
+                <p>This will remove cached offline totals, draft form inputs, and last sync timestamps from your browser's local storage.</p>
+                <p className="font-bold text-gray-800">The application will automatically reload to fetch fresh remote data from the server.</p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowClearCacheConfirm(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 h-10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearCache}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white h-10 rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={14} /> Clear & Reload
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Account Controls */}
         <div className="bg-red-50 rounded-3xl p-6 border border-red-100 flex items-center justify-between">

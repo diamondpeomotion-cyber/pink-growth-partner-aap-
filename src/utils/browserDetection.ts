@@ -47,7 +47,7 @@ export function detectBrowserAndOS(): DeviceBrowserInfo {
     os = 'android';
     osName = 'Android';
   } else if (isMacOS) {
-    os = 'macOS';
+    os = 'macos';
     osName = 'macOS';
   } else if (isWindows) {
     os = 'windows';

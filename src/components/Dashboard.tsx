@@ -32,6 +32,19 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
           }
         }
 
+        // 1. Try reading from nexora_dashboard_cache in localStorage first
+        const savedDashboardCache = localStorage.getItem('nexora_dashboard_cache');
+        if (savedDashboardCache) {
+          const parsedCache = JSON.parse(savedDashboardCache);
+          if (parsedCache.availableAmount !== undefined) {
+            setAvailableAmount(parsedCache.availableAmount);
+          }
+          if (parsedCache.qualifyingShopsCount !== undefined) {
+            setCurrentShops(parsedCache.qualifyingShopsCount);
+          }
+        }
+
+        // 2. Read IndexedDB items if present
         const cachedEarnings = await getItem<any>('earnings_data');
         if (cachedEarnings && cachedEarnings.availableAmount !== undefined) {
           setAvailableAmount(cachedEarnings.availableAmount);
@@ -40,10 +53,12 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
         const cachedShopsData = await getItem<any[]>('myshops_data');
         if (cachedShopsData) {
           const qualifying = cachedShopsData.filter(s => s.status === 'Qualifying').length;
-          setCurrentShops(qualifying > 0 ? qualifying : 250); // Just a mock fallback
+          if (qualifying > 0) {
+            setCurrentShops(qualifying);
+          }
         }
       } catch (err) {
-        console.error('Failed to load from IndexedDB', err);
+        console.error('Failed to load cached dashboard data:', err);
       }
     };
     loadData();
