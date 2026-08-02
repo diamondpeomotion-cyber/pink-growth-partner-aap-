@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft,
   User,
@@ -17,34 +18,105 @@ interface HelpArticleScreenProps {
   articleId?: string;
 }
 
-export default function HelpArticleScreen({ onBack, articleId = 'verify-shop' }: HelpArticleScreenProps) {
-  // In a real app, you'd fetch article data based on articleId
-  const article = {
+interface ArticleStep {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}
+
+interface ArticleContent {
+  title: string;
+  description: string;
+  steps: ArticleStep[];
+}
+
+/**
+ * Knowledge-base content keyed by the topic id emitted from SupportScreen.
+ * Previously a single hard-coded article was rendered for every topic, so all
+ * six help cards opened the same "How do I verify a shop?" page.
+ */
+const ARTICLES: Record<string, ArticleContent> = {
+  'verify-shop': {
     title: 'How do I verify a shop?',
-    description: 'A complete guide to successfully onboarding and verifying a new partner salon on the Nexora platform.',
+    description:
+      'A complete guide to successfully onboarding and verifying a new partner salon on the Nexora platform.',
     steps: [
-      {
-        icon: Store,
-        title: '1. Onboard Shop',
-        desc: 'Enter the primary salon details, including name, location, and owner contact information into the partner portal.'
-      },
-      {
-        icon: ClipboardCheck,
-        title: '2. Complete KYC',
-        desc: 'Upload the required business registration documents and owner identification for our compliance team to review.'
-      },
-      {
-        icon: QrCode,
-        title: '3. Nexora QR Activation',
-        desc: "Generate and link a unique Nexora payment QR code to the salon's verified account to enable direct payouts."
-      },
-      {
-        icon: Calendar,
-        title: '4. 15-day Qualification Period',
-        desc: 'The shop will undergo a 15-day monitoring period to ensure transaction volume and service quality meet Nexora standards.'
-      }
-    ]
-  };
+      { icon: Store, title: '1. Onboard Shop', desc: 'Enter the primary salon details, including name, location, and owner contact information into the partner portal.' },
+      { icon: ClipboardCheck, title: '2. Complete KYC', desc: 'Upload the required business registration documents and owner identification for our compliance team to review.' },
+      { icon: QrCode, title: '3. Nexora QR Activation', desc: "Generate and link a unique Nexora payment QR code to the salon's verified account to enable direct payouts." },
+      { icon: Calendar, title: '4. 15-day Qualification Period', desc: 'The shop will undergo a 15-day monitoring period to ensure transaction volume and service quality meet Nexora standards.' },
+    ],
+  },
+  onboarding: {
+    title: 'Shop onboarding, step by step',
+    description:
+      'Everything you need to collect before adding a salon so the registration clears review on the first attempt.',
+    steps: [
+      { icon: Store, title: '1. Owner details', desc: 'Capture the owner name, mobile number and preferred language. The mobile number must be OTP verified before you continue.' },
+      { icon: ClipboardCheck, title: '2. Shop & location', desc: 'Add the shop name, category and the full address with pincode. An accurate pin drop speeds up field verification.' },
+      { icon: Calendar, title: '3. Business details', desc: 'Record opening hours, weekly off, staff count and the service menu with starting prices.' },
+      { icon: QrCode, title: '4. Submit for review', desc: 'Upload the storefront photo and submit. Most shops are reviewed within 48 working hours.' },
+    ],
+  },
+  kyc: {
+    title: 'KYC & document requirements',
+    description:
+      'Which documents are mandatory, the accepted formats, and the most common reasons an upload gets rejected.',
+    steps: [
+      { icon: ClipboardCheck, title: 'Mandatory documents', desc: 'Aadhaar (front), PAN card and a clear shop-front photo showing the signage are required for every shop.' },
+      { icon: Store, title: 'Optional documents', desc: 'Aadhaar back and Voter ID help resolve address mismatches faster but are not blocking.' },
+      { icon: QrCode, title: 'File rules', desc: 'JPG, PNG or PDF up to 5 MB per file. All four corners must be visible and the text must be readable.' },
+      { icon: Calendar, title: 'Common rejections', desc: 'Blurred photos, cropped edges, glare over the ID number, or a name that does not match the bank account.' },
+    ],
+  },
+  qr: {
+    title: 'QR qualification explained',
+    description:
+      'How a shop becomes "qualifying" and what counts towards your reward milestones.',
+    steps: [
+      { icon: QrCode, title: 'Valid transactions only', desc: 'Only successful payments made through the Nexora QR count. Cash and personal QR payments are excluded.' },
+      { icon: Calendar, title: 'Daily target', desc: 'A shop must record at least ₹1,000 of verified Nexora QR volume in a day for that day to pass.' },
+      { icon: ClipboardCheck, title: '15-day window', desc: 'The shop needs to pass the daily target on the majority of days inside the 15-day qualification window.' },
+      { icon: Store, title: 'Staying qualified', desc: 'Qualification is re-checked monthly. A shop that stops transacting drops out of your qualifying count.' },
+    ],
+  },
+  earnings: {
+    title: 'Earnings & reversals',
+    description:
+      'How commission is calculated, when it is credited, and why an amount can be reversed.',
+    steps: [
+      { icon: QrCode, title: 'How it is calculated', desc: 'Commission accrues on verified Nexora QR volume from each of your qualifying shops.' },
+      { icon: Calendar, title: 'When it appears', desc: 'Verified transactions move into "Available earnings" after the standard settlement check, usually the next working day.' },
+      { icon: ClipboardCheck, title: 'Why reversals happen', desc: 'Refunded, disputed or fraudulent transactions are deducted from your ledger with a matching reversal entry.' },
+      { icon: Store, title: 'Tracking it', desc: 'Open Earnings → shop ledger to see every credit and reversal line item for a single shop.' },
+    ],
+  },
+  payouts: {
+    title: 'Payouts & bank settlement',
+    description:
+      'Payout cycles, minimum thresholds and what to do when a transfer fails.',
+    steps: [
+      { icon: Calendar, title: 'Payout cycle', desc: 'Available earnings are settled on a 7-day cycle to the bank account linked in your profile.' },
+      { icon: ClipboardCheck, title: 'Before your first payout', desc: 'Your PAN and bank account must be verified, and the account holder name must match your KYC name.' },
+      { icon: QrCode, title: 'Tracking a transfer', desc: 'Every settlement gets a UTR reference. Find it under Payouts → payout history.' },
+      { icon: Store, title: 'If a payout fails', desc: 'Failed transfers return to your available balance within 3 working days. Correct the bank details and it retries next cycle.' },
+    ],
+  },
+  rewards: {
+    title: 'Reward claims',
+    description:
+      'How milestone rewards unlock and what happens after you submit a claim.',
+    steps: [
+      { icon: Store, title: 'Milestones', desc: 'Rewards unlock at 25, 50, 100 and 250 qualifying shops. Only currently qualifying shops count.' },
+      { icon: ClipboardCheck, title: 'Claiming', desc: 'Once a milestone unlocks, open Rewards, pick your reward, and submit the claim. You get a claim ID immediately.' },
+      { icon: Calendar, title: 'Review period', desc: 'Claims go through a 72-hour security audit before dispatch or credit is scheduled.' },
+      { icon: QrCode, title: 'Keep KYC current', desc: 'Physical rewards ship to your registered address, so make sure your profile and PAN details are up to date.' },
+    ],
+  },
+};
+
+export default function HelpArticleScreen({ onBack, articleId = 'verify-shop' }: HelpArticleScreenProps) {
+  const article = ARTICLES[articleId] ?? ARTICLES['verify-shop'];
 
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] min-h-screen overflow-x-hidden pb-24 antialiased font-sans">

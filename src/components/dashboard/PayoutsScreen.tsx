@@ -6,20 +6,11 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  TrendingUp,
   X,
   Sparkles,
-  ChevronRight,
-  Info,
-  Calendar,
   CreditCard,
   Building,
   RefreshCw,
-  Plus,
-  Lock,
-  DollarSign,
-  AlertCircle,
-  Award,
   Check
 } from 'lucide-react';
 import BottomNav from './BottomNav';
@@ -93,7 +84,7 @@ export default function PayoutsScreen({
 
       {/* Top Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs h-16">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -128,7 +119,7 @@ export default function PayoutsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[--page-margin] space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[var(--page-margin)] space-y-5">
         
         {/* Main Payout Bento Card */}
         <section className="bg-white rounded-3xl p-5 shadow-sm border border-gray-200/60 relative overflow-hidden">

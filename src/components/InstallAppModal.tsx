@@ -7,7 +7,6 @@ import {
   Share2,
   CheckCircle2,
   Sparkles,
-  ExternalLink,
   Laptop,
   Globe,
   Compass,
@@ -17,6 +16,7 @@ import {
   Copy
 } from 'lucide-react';
 import { detectBrowserAndOS, InstallHelpTab, DeviceBrowserInfo } from '../utils/browserDetection';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface InstallAppModalProps {
   isOpen: boolean;
@@ -24,34 +24,39 @@ interface InstallAppModalProps {
 }
 
 export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProps) {
-  // Detect device & browser info on load
-  const [deviceInfo, setDeviceInfo] = useState<DeviceBrowserInfo>(() => detectBrowserAndOS());
-  
+  // Detect device & browser info once. Calling detectBrowserAndOS() twice
+  // (and again from an effect) recomputed the same value on every open and
+  // reset the user's tab choice.
+  const [deviceInfo] = useState<DeviceBrowserInfo>(detectBrowserAndOS);
+
   // State for the selected helpTab - initialized automatically based on user's browser/OS
-  const [helpTab, setHelpTab] = useState<InstallHelpTab>(() => {
-    return detectBrowserAndOS().recommendedHelpTab;
-  });
+  const [helpTab, setHelpTab] = useState<InstallHelpTab>(() => deviceInfo.recommendedHelpTab);
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [installSuccess, setInstallSuccess] = useState(false);
 
-  // Update detection on mount and listen for PWA install prompt
+  // Listen for the PWA install prompt. Registered once for the lifetime of the
+  // component (not per `isOpen` change) so the event isn't missed while closed.
   useEffect(() => {
-    const info = detectBrowserAndOS();
-    setDeviceInfo(info);
-    setHelpTab(info.recommendedHelpTab);
-
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, [isOpen]);
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setInstallSuccess(true);
+    };
 
-  if (!isOpen) return null;
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
 
   const handleTriggerInstall = async () => {
     if (deferredPrompt) {
@@ -78,17 +83,17 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
   };
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.origin);
+    const copied = await copyToClipboard(window.location.origin);
+    if (copied) {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
-    } catch {
-      // Fallback
     }
   };
 
+
   return (
     <AnimatePresence>
+      {isOpen && (
       <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
         {/* Backdrop */}
         <motion.div
@@ -446,6 +451,7 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 }

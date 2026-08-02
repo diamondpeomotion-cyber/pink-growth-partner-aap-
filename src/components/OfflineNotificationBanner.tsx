@@ -1,25 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { WifiOff, Database, X, AlertCircle } from 'lucide-react';
+import { WifiOff, Database, X } from 'lucide-react';
 
 interface OfflineNotificationBannerProps {
   isOnline: boolean;
 }
 
 export default function OfflineNotificationBanner({ isOnline }: OfflineNotificationBannerProps) {
-  const [dismissed, setDismissed] = useState(false);
+  // Track which offline "session" the user dismissed instead of resetting the
+  // flag from an effect. Deriving it during render means the banner reappears
+  // immediately on the next disconnect without an extra render pass.
+  const [dismissedWhileOffline, setDismissedWhileOffline] = useState(false);
 
-  // Reset dismissed state when user toggles offline status
-  useEffect(() => {
-    if (isOnline) {
-      setDismissed(false);
-    }
-  }, [isOnline]);
+  if (isOnline && dismissedWhileOffline) {
+    // Coming back online ends the current offline session.
+    setDismissedWhileOffline(false);
+  }
 
-  if (isOnline || dismissed) return null;
+  const isVisible = !isOnline && !dismissedWhileOffline;
 
   return (
+    // Keeping AnimatePresence mounted (and toggling its child) is what allows
+    // the exit animation to run; returning null early skipped it entirely.
     <AnimatePresence>
+      {isVisible && (
       <motion.div
         initial={{ opacity: 0, y: -20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -49,7 +53,7 @@ export default function OfflineNotificationBanner({ isOnline }: OfflineNotificat
           </div>
 
           <button
-            onClick={() => setDismissed(true)}
+            onClick={() => setDismissedWhileOffline(true)}
             className="text-amber-300/70 hover:text-amber-200 p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
             title="Dismiss offline alert"
           >
@@ -57,6 +61,7 @@ export default function OfflineNotificationBanner({ isOnline }: OfflineNotificat
           </button>
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

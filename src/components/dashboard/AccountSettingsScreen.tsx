@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ArrowLeft, 
   User, 
@@ -7,13 +7,11 @@ import {
   Bell, 
   CheckCircle2, 
   Save, 
-  ChevronRight,
   ShieldCheck,
   Eye,
   EyeOff,
   Database,
   Trash2,
-  RefreshCw,
   AlertTriangle,
   X
 } from 'lucide-react';
@@ -24,7 +22,7 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {
+      } catch {
         // Fallback
       }
     }
@@ -75,8 +73,8 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
       setTimeout(() => {
         window.location.reload();
       }, 1500);
-    } catch (e) {
-      console.error('Failed clearing cache:', e);
+    } catch (err) {
+      console.error('Failed clearing cache:', err);
     }
   };
 
@@ -105,7 +103,7 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
     <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-28 w-full shadow-lg border-x border-gray-100">
       {/* Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-3">
             <button 
               onClick={onBack}
@@ -127,7 +125,7 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-6 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-[var(--page-margin)] pt-6 space-y-6">
         {savedSuccess && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in">
             <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />

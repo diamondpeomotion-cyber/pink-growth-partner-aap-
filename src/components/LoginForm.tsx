@@ -1,12 +1,26 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Eye, EyeOff, User, Lock, AlertCircle, Mail, CheckCircle2, X } from 'lucide-react';
 
 export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [username, setUsername] = useState('');
+  // Read the remembered username during lazy initialisation so the input is
+  // already populated on the very first paint (no empty-then-filled flash).
+  const [username, setUsername] = useState(() => {
+    try {
+      return localStorage.getItem('rememberedUsername') || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('rememberedUsername'));
+    } catch {
+      return false;
+    }
+  });
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [passwordStrength, setPasswordStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
   const [message, setMessage] = useState<{ type: 'error' | 'warning' | 'info'; text: string } | null>(null);
@@ -16,14 +30,6 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
   const [resetEmail, setResetEmail] = useState('');
   const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [resetError, setResetError] = useState('');
-
-  useEffect(() => {
-    const savedUsername = localStorage.getItem('rememberedUsername');
-    if (savedUsername) {
-      setUsername(savedUsername);
-      setRememberMe(true);
-    }
-  }, []);
 
   const validateUsername = (val: string) => {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);

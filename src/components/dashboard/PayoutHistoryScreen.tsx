@@ -2,25 +2,15 @@ import React, { useState } from 'react';
 import {
   ArrowLeft,
   Calendar,
-  DollarSign,
   CheckCircle2,
   Clock,
   XCircle,
-  TrendingUp,
   AlertCircle,
-  HelpCircle,
   Sparkles,
-  ArrowRight,
   ChevronRight,
-  Info,
-  Building,
   RefreshCw,
-  Plus,
-  FileText,
   AlertTriangle,
-  X,
-  Smartphone,
-  Check
+  X
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -145,7 +135,7 @@ export default function PayoutHistoryScreen({
 
       {/* Top Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -171,7 +161,7 @@ export default function PayoutHistoryScreen({
       </header>
 
       {/* Main Area */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[--page-margin] space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[var(--page-margin)] space-y-5">
         
         {/* Dynamic Metrics Section */}
         <section className="bg-primary rounded-3xl p-5 text-white shadow-md relative overflow-hidden">

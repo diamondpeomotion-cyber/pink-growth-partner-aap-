@@ -1,27 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   Info,
-  CheckCircle,
   Lock,
   Flag,
-  Sparkles,
   Award,
   AlertTriangle,
   Gift,
-  HelpCircle,
-  Compass,
   Trophy,
   Check,
   Shield,
   Smartphone,
   Bike,
   Car,
-  ChevronRight,
   Tablet,
   Laptop
 } from 'lucide-react';
+import rewardLaptop from '../../assets/images/reward-laptop.jpg';
+import rewardScooter from '../../assets/images/reward-scooter.jpg';
+import rewardTablet from '../../assets/images/reward-tablet.jpg';
+import rewardWelcomeKit from '../../assets/images/reward-welcome-kit.jpg';
+import { createShortRef } from '../../utils/id';
 import BottomNav from './BottomNav';
 
 interface MilestoneReward {
@@ -44,7 +44,7 @@ const MILESTONES: MilestoneReward[] = [
     claimShops: 26,
     maxValue: 5000,
     description: 'Welcome kit containing premium Nexora branding materials, QR stands, and merchant scanner devices to launch shop operations.',
-    imgUrl: 'https://lh3.googleusercontent.com/aida/AP1WRLsQYbhxh1DH7QoMmtAR5ST6vxphwEWTLFBw5QqCzRnVj6jeH_2ACDDy2p7G91iTvg4NGYZ2WD55CHo9gER282EBOFdypuHPiPEQfBB89nPCNvtJL-kA5zkUkhcQZhNOTRmTJldmrL9ipaq_JQrJRE5GsPgl2V0pRglqiUklHdLEejc94shDJ6S1-YyMESQ69jHJ5VWlTl2YRriwDivMDwqC56APcbxNg2Td9X_3-FT1KkirBYw9b1a-gAw',
+    imgUrl: rewardWelcomeKit,
     specs: [
       { label: 'Branding Banner', value: 'Includes 1 flex roll-up' },
       { label: 'QR Acrylic Stands', value: '5 counter-top premium stands' },
@@ -65,7 +65,7 @@ const MILESTONES: MilestoneReward[] = [
     claimShops: 51,
     maxValue: 15000,
     description: 'A powerful, sleek 10.1-inch work tablet customized with pre-loaded merchant apps, analytics software, and instant scan notification systems.',
-    imgUrl: 'https://lh3.googleusercontent.com/aida/AP1WRLvmOvLjk-ut4pLD7D9Zb8g5rpLksMs7Bhi_Zl6OmioDbyFjCODGUM9mnYDSHyR8cUnmO2LGS3FlFXrAf_Lxdx1q4mealfGaUCKiCftfmA-XIpwfJ3w8tho4CYEswzqgEuIFQJQn-ptEIT4bq3rPkAA7xyQgGEUebF4UbodQcU8c_BgBlatPMNEEn0_bf-aLySJYKSANfeG9XYUdqjKi53k75H07sKRLoJL96DTFBcMEHB3uuzhBkTHGmhg',
+    imgUrl: rewardTablet,
     specs: [
       { label: 'Display Size', value: '10.1" IPS Touchscreen' },
       { label: 'Performance', value: '4GB RAM + 64GB ROM' },
@@ -86,7 +86,7 @@ const MILESTONES: MilestoneReward[] = [
     claimShops: 101,
     maxValue: 35000,
     description: 'Professional high-performance laptop designed for advanced analytics, inventory sheets, merchant reports, and full administration of the shop network.',
-    imgUrl: 'https://lh3.googleusercontent.com/aida/AP1WRLsgm41kqjSpqbXSFtRAeMlu_H4XiGRe_Ow7dN-vsSMI985s91UMSHaubXXc2AIj_avqSl0E0icqbWV3OCwJ9OKxIvnpPr5QMSAYKylYBZLVhtiJn3dvKgHATcDeZsLyJc9thJW9Q6TfA1G0mUoN6dTNUiKYxPm4XqrpF7mOzeLk443kGiakFTPonyHSnXrc6W0cLb6tBhtdayJ1haTrdAwFqqs7eTYc29wYAyXqxvl3z_dVOP6nb0ZAHhw',
+    imgUrl: rewardLaptop,
     specs: [
       { label: 'Processor', value: 'Intel Core i3 / Equivalent' },
       { label: 'Memory / Disk', value: '8GB DDR4 + 512GB SSD' },
@@ -107,7 +107,7 @@ const MILESTONES: MilestoneReward[] = [
     claimShops: 251,
     maxValue: 105000,
     description: 'Eco-friendly premium electric scooter (Ola S1 Air or equivalent EV) to commute effortlessly and efficiently across your shop network locations.',
-    imgUrl: 'https://lh3.googleusercontent.com/aida/AP1WRLsKvNZesLlo1Xyydqp7caWmSRvyHR1XFMhSyftD4uIDKtY1xUA_8c4CDmNiLWgQzAttQv2NKA4jqT9sXrX8CoJD9HnvoMoBFG8BAtLsJlOuA5rN_t2ZZ3-jfOTsxXt_zzc_1tMVDsS1duG4s8kvd1IH6oTt_a_hwQF1y8Hp-wueG7brJGy0PauxM2azw81tyEgciS0rmKBWjTiTwvms6iffGTaEhk4y1_GtvfWoh_uq2xViwwHk1uw3DjQ',
+    imgUrl: rewardScooter,
     specs: [
       { label: 'True Range', value: '125 KM True Range' },
       { label: 'Charging Time', value: '4.5 Hrs Home Charging' },
@@ -193,19 +193,25 @@ export default function RewardDetailsScreen({
   onNavigate: (page: string) => void;
   onBack: () => void;
 }) {
-  const [qualifyingCount, setQualifyingCount] = useState<number>(247);
+  const [qualifyingCount] = useState<number>(() => {
+    // Read the simulated count during initialisation so the milestone maths is
+    // correct on the first render (the effect version rendered 247 first and
+    // then corrected itself, briefly showing the wrong reward status).
+    try {
+      const savedCount = localStorage.getItem('simulatedQualifyingCount');
+      const parsed = savedCount ? parseInt(savedCount, 10) : NaN;
+      return Number.isFinite(parsed) ? parsed : 247;
+    } catch {
+      return 247;
+    }
+  });
   const [selectedRewardId, setSelectedRewardId] = useState<number>(250);
   const [showClaimSuccess, setShowClaimSuccess] = useState<boolean>(false);
+  // Generated once when the claim is submitted. Previously this was computed
+  // inline in the JSX with Date.now(), so the "Claim ID" shown to the partner
+  // changed on every re-render of the success dialog.
+  const [claimId, setClaimId] = useState<string>('');
   const [claimType, setClaimType] = useState<'scooter' | 'cash' | 'welcome' | 'tablet' | 'laptop' | null>(null);
-
-  useEffect(() => {
-    // Dynamically retrieve simulated qualifying count if set in previous screen
-    // We synchronize nicely using local storage
-    const savedCount = localStorage.getItem('simulatedQualifyingCount');
-    if (savedCount) {
-      setQualifyingCount(parseInt(savedCount) || 247);
-    }
-  }, []);
 
   const activeReward = MILESTONES.find(m => m.id === selectedRewardId) || MILESTONES[3];
 
@@ -245,6 +251,7 @@ export default function RewardDetailsScreen({
         ? 'laptop'
         : 'cash'
     );
+    setClaimId(createShortRef());
     setShowClaimSuccess(true);
   };
 
@@ -265,7 +272,7 @@ export default function RewardDetailsScreen({
       
       {/* Sticky Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-xs h-14">
-        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-14">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[var(--page-margin)] h-14">
           <button
             onClick={onBack}
             className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-pink-50 text-gray-700 transition-colors cursor-pointer"
@@ -285,10 +292,10 @@ export default function RewardDetailsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-screen-xl mx-auto w-full pt-6 px-[--page-margin] space-y-4">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full pt-6 px-[var(--page-margin)] space-y-4">
         
         {/* Horizontal Reward Selector Chips */}
-        <div className="flex gap-2 overflow-x-auto py-2 no-scrollbar -mx-4 px-4 shrink-0">
+        <div className="flex gap-2 overflow-x-auto py-2 no-scrollbar -mx-[var(--page-margin)] px-[var(--page-margin)] scroll-pl-[var(--page-margin)] shrink-0">
           {MILESTONES.map((milestone) => {
             const isSelected = selectedRewardId === milestone.id;
             const isMilestoneReached = qualifyingCount >= milestone.milestoneShops;
@@ -633,7 +640,7 @@ export default function RewardDetailsScreen({
               </p>
 
               <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-left text-xs space-y-1 text-gray-500">
-                <p><strong>Claim ID:</strong> CLM-{Date.now().toString().slice(-6)}</p>
+                <p><strong>Claim ID:</strong> CLM-{claimId}</p>
                 <p><strong>Method:</strong> Standard KYC direct allotment</p>
                 <p><strong>Status:</strong> Processing (Subject to 72-hr security audit review)</p>
               </div>

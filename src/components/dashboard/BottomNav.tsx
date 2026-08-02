@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Store, DollarSign, Award, User, Bell } from 'lucide-react';
+import { Home, Store, DollarSign, User, Bell } from 'lucide-react';
 
 export default function BottomNav({ onNavigate, currentPage }: { onNavigate?: (page: string) => void, currentPage?: string }) {
   const items = [

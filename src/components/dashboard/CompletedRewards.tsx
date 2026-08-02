@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import rewardWelcomeKit from '../../assets/images/reward-welcome-kit.jpg';
 
 export default function CompletedRewards({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -10,7 +11,7 @@ export default function CompletedRewards({ onNavigate }: { onNavigate?: (page: s
     { title: 'Professional Welcome Package', status: 'Delivered', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB-ExG4LCVuMIEW9VhEx0ggi_FPtrYtRRK4RHyGoNPsUVUCFmq87fJPjGoqB9F8LcUp8GaaCawPF9_0RbwIeFA8PLJ3wYignWqlrjasFBPhV35SW7VJKK7sHJqe2KaZ0MjSJL_5rT43oGyB4ZewE3ZUhpsB91Nb28agWZbx0AzmppgAnmO4SdPiEA1WAZi89LzI0ujWajVtFoj619M6ZnGW5a-UGnDOy08xUEHoC4xvUCeBgUOMFNAU' },
     { title: 'Work Tablet Package', status: 'Delivered', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBh6Bm_DbL0PFSw9jrXHsycfXy78aBV-1-k644n5aT3dCCJ7UQ9BFwJi8AhGRHOpPgbtWyBi2VSX6hzU8_ut333eCgepTqfiH-MiftrtBiFtSFlVKPlphm_ccazXgtdR2HjQwfnbb7Nzg5ssAGhkFNZDJXbihNJ3hFY3akODEslIl1O0oUHFl224bTHnhb9BrsAI8bf3bCmLUGZnEbgE0QZyUUkOYcIPu0XWalRTg_U4CbIb2Pt9Cdp' },
     { title: 'Laptop Reward', status: 'Delivered', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDj4qvoCfbw2YqsfMFy6ggy8_48o0zLkh_fRyseE5HItG5umSe3ILYlCEDqdaPWFMQ44tkViGnW48E2Z__U5W-SuQRDw9Ctf1bF2yg9eA93g9u3gSRB4hHKlMNm3zn0FT7GE84qZYmE48cWxIcKdDC-3coaWH3U9RLOgeVsCFg3p2SUouQtqmgEgXdeV4jXvU0EffYkUvSx7KmL3jOGSyVFFl73q4nQQX3DBVF-si2vZNv1c2_l77uv' },
-    { title: 'Business Branding Kit', status: 'Delivered', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB_vH1Yv3C_4p_H_p_H_p_H_p_H' },
+    { title: 'Business Branding Kit', status: 'Delivered', image: rewardWelcomeKit },
   ];
 
   const handleScroll = () => {

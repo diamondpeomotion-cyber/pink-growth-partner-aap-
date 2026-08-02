@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { 
   ArrowLeft, 
-  Globe, 
   Smartphone, 
   Monitor, 
   Sparkles, 
   Star, 
   MapPin, 
   Share2, 
-  ExternalLink,
   CheckCircle2,
   Calendar,
   X
 } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
+import spaWellnessCover from '../../assets/images/spa_wellness_cover_1785213647098.jpg';
+import nailStudioCover from '../../assets/images/nail_studio_cover_1785213674923.jpg';
 import CancellationPolicyModal from '../CancellationPolicyModal';
 
 export default function WebsitePreviewScreen({ onBack }: { onBack: () => void }) {
@@ -47,16 +48,9 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
       }
     }
 
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-      }
-      setShareToast('Storefront link copied to clipboard!');
-      setTimeout(() => setShareToast(null), 3500);
-    } catch (e) {
-      setShareToast('Storefront link copied to clipboard!');
-      setTimeout(() => setShareToast(null), 3500);
-    }
+    const copied = await copyToClipboard(url);
+    setShareToast(copied ? 'Storefront link copied to clipboard!' : `Storefront link: ${url}`);
+    setTimeout(() => setShareToast(null), 3500);
   };
 
   const handleOpenBooking = (serviceName?: string) => {
@@ -203,9 +197,9 @@ export default function WebsitePreviewScreen({ onBack }: { onBack: () => void })
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { name: 'Bridal HD Makeup & Hair', price: '₹7,499', time: '120 mins', img: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=400&q=80', desc: 'Complete premium bridal makeup with airbrush finish & designer hair styling.' },
-                  { name: 'Gold Facial & Skin Glow', price: '₹1,499', time: '60 mins', img: 'https://images.unsplash.com/photo-1512290900672-17730e2f3d99?auto=format&fit=crop&w=400&q=80', desc: 'Rejuvenating 24k gold leaf facial for instant radiance and deep cleansing.' },
+                  { name: 'Gold Facial & Skin Glow', price: '₹1,499', time: '60 mins', img: spaWellnessCover, desc: 'Rejuvenating 24k gold leaf facial for instant radiance and deep cleansing.' },
                   { name: 'Keratin Hair Spa & Treatment', price: '₹999', time: '45 mins', img: 'https://images.unsplash.com/photo-1560869713-7d0a29430803?auto=format&fit=crop&w=400&q=80', desc: 'Deep nourishing treatment for frizzy and damaged hair.' },
-                  { name: 'Luxury Manicure & Pedicure', price: '₹799', time: '50 mins', img: 'https://images.unsplash.com/photo-1632345031435-8727f6c97d34?auto=format&fit=crop&w=400&q=80', desc: 'Relaxing hand and foot spa with exfoliating scrub and massage.' },
+                  { name: 'Luxury Manicure & Pedicure', price: '₹799', time: '50 mins', img: nailStudioCover, desc: 'Relaxing hand and foot spa with exfoliating scrub and massage.' },
                 ].map((svc, i) => (
                   <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
                     <div className="flex items-start gap-3.5 mb-3">

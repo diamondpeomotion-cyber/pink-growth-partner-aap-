@@ -2,25 +2,21 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   ArrowLeft,
   Bell,
-  Award,
   Info,
   CheckCircle2,
-  Clock,
   ArrowRight,
   Sparkles,
   Plus,
   X,
   Gift,
-  HelpCircle,
   TrendingUp,
   AlertTriangle,
   Zap,
   Check,
   Star,
-  Users,
-  Store,
-  ChevronRight
+  Store
 } from 'lucide-react';
+import rewardScooter from '../../assets/images/reward-scooter.jpg';
 import BottomNav from './BottomNav';
 
 interface RewardShop {
@@ -153,7 +149,7 @@ export default function RewardsScreen({
 
       {/* Sticky Header */}
       <header className="sticky top-0 w-full z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-xs h-16">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -187,7 +183,7 @@ export default function RewardsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-4 pb-16 px-[--page-margin] space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-4 pb-16 px-[var(--page-margin)] space-y-5">
 
         {/* Mandatory Notice Banner */}
         <section className="bg-amber-50/50 border border-amber-200/60 rounded-3xl p-4 flex gap-3 items-start shadow-3xs">
@@ -215,7 +211,7 @@ export default function RewardsScreen({
           <div className="h-44 w-full relative overflow-hidden bg-gray-100">
             <img
               className="w-full h-full object-cover object-center"
-              src="https://lh3.googleusercontent.com/aida/AP1WRLsKvNZesLlo1Xyydqp7caWmSRvyHR1XFMhSyftD4uIDKtY1xUA_8c4CDmNiLWgQzAttQv2NKA4jqT9sXrX8CoJD9HnvoMoBFG8BAtLsJlOuA5rN_t2ZZ3-jfOTsxXt_zzc_1tMVDsS1duG4s8kvd1IH6oTt_a_hwQF1y8Hp-wueG7brJGy0PauxM2azw81tyEgciS0rmKBWjTiTwvms6iffGTaEhk4y1_GtvfWoh_uq2xViwwHk1uw3DjQ"
+              src={rewardScooter}
               alt="Electric Scooter Reward"
               referrerPolicy="no-referrer"
             />
@@ -505,7 +501,7 @@ export default function RewardsScreen({
             <div className="h-40 relative bg-gray-100">
               <img
                 className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida/AP1WRLsKvNZesLlo1Xyydqp7caWmSRvyHR1XFMhSyftD4uIDKtY1xUA_8c4CDmNiLWgQzAttQv2NKA4jqT9sXrX8CoJD9HnvoMoBFG8BAtLsJlOuA5rN_t2ZZ3-jfOTsxXt_zzc_1tMVDsS1duG4s8kvd1IH6oTt_a_hwQF1y8Hp-wueG7brJGy0PauxM2azw81tyEgciS0rmKBWjTiTwvms6iffGTaEhk4y1_GtvfWoh_uq2xViwwHk1uw3DjQ"
+                src={rewardScooter}
                 alt="Electric Scooter"
                 referrerPolicy="no-referrer"
               />

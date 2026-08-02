@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Globe, Palette, Store, CheckCircle2, Share2, QrCode, Sparkles, Eye, Save, X, Check, Smartphone, Monitor, RotateCcw, ExternalLink, Lock } from 'lucide-react';
+import { ArrowLeft, Globe, Palette, CheckCircle2, Share2, Eye, Save, X, Check, Smartphone, Monitor } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
 
 const PRESET_COLORS = [
   { hex: '#b90064', name: 'Magenta Pink' },
@@ -30,7 +31,9 @@ export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: 
         const parsed = JSON.parse(draft);
         if (parsed.isPublished !== undefined) return parsed.isPublished;
       }
-    } catch (e) {}
+    } catch (err) {
+      console.warn('Unable to read published flag:', err);
+    }
     return true;
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -56,14 +59,9 @@ export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: 
       }
     }
 
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareToast('Storefront link copied to clipboard!');
-      setTimeout(() => setShareToast(null), 3500);
-    } catch (e) {
-      setShareToast(`Storefront link: ${url}`);
-      setTimeout(() => setShareToast(null), 3500);
-    }
+    const copied = await copyToClipboard(url);
+    setShareToast(copied ? 'Storefront link copied to clipboard!' : `Storefront link: ${url}`);
+    setTimeout(() => setShareToast(null), 3500);
   };
 
   const handleColorSelect = (hex: string, name?: string) => {
@@ -96,7 +94,9 @@ export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: 
   const handleSave = () => {
     try {
       localStorage.setItem('store_is_published', JSON.stringify(isPublished));
-    } catch (e) {}
+    } catch (err) {
+      console.warn('Unable to persist published flag:', err);
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
@@ -105,7 +105,7 @@ export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: 
     <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-28 w-full shadow-lg border-x border-gray-100">
       {/* Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex items-center justify-between px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-3">
             <button 
               onClick={onBack}
@@ -127,7 +127,7 @@ export default function WebsiteSettingsScreen({ onBack, onNavigate }: { onBack: 
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-6 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-[var(--page-margin)] pt-6 space-y-6">
         {savedSuccess && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in">
             <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />

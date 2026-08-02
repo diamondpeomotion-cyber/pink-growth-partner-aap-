@@ -9,12 +9,18 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": [
         "./*"
@@ -22,5 +28,9 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "src",
+    "vite.config.ts"
+  ]
 }

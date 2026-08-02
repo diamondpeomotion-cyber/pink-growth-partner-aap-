@@ -46,7 +46,7 @@ export default function QuickActions({ onNavigate }: { onNavigate?: (page: strin
   };
 
   return (
-    <section className="-mx-5 px-5 relative group">
+    <section className="-mx-[var(--page-margin)] px-[var(--page-margin)] relative group">
       <h3 className="text-xl font-semibold text-[#1b1c1b] mb-4 px-1">Quick Actions</h3>
       
       {showLeftArrow && (

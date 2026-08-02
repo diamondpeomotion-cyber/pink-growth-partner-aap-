@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QrCode, ArrowLeft, Camera, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
   const [scanning, setScanning] = useState(true);
@@ -26,7 +26,7 @@ export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-8 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-[var(--page-margin)] pt-8 space-y-6">
         {scanning ? (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
             <div className="w-64 h-64 bg-gray-900 rounded-2xl relative overflow-hidden flex items-center justify-center shadow-inner mb-6">

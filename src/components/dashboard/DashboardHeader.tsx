@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, LogOut, WifiOff, RefreshCw, CheckCircle2, Smartphone, Clock, Database, Check, X, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Bell, LogOut, WifiOff, RefreshCw, CheckCircle2, Smartphone, Clock, Database, X, ShieldCheck } from 'lucide-react';
 import InstallAppModal from '../InstallAppModal';
+import Avatar from '../Avatar';
 
 function formatSyncTime(date: Date): string {
   const now = new Date();
@@ -27,16 +28,18 @@ function OfflineSyncStatus({
   lastSyncedAt: Date | null; 
   onClick: () => void;
 }) {
-  const [formattedTime, setFormattedTime] = useState<string>(() => lastSyncedAt ? formatSyncTime(lastSyncedAt) : 'Just now');
+  // `tick` only exists to re-render the relative timestamp every 10s. The label
+  // itself is derived during render so it is always in sync with `lastSyncedAt`
+  // (previously the effect wrote stale state on the first pass after a change).
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     if (!lastSyncedAt) return;
-    setFormattedTime(formatSyncTime(lastSyncedAt));
-    const interval = setInterval(() => {
-      setFormattedTime(formatSyncTime(lastSyncedAt));
-    }, 10000); // update every 10s
+    const interval = setInterval(() => setTick((t) => t + 1), 10000);
     return () => clearInterval(interval);
   }, [lastSyncedAt]);
+
+  const formattedTime = lastSyncedAt ? formatSyncTime(lastSyncedAt) : 'Just now';
 
   if (!isOnline) {
     return (
@@ -93,40 +96,62 @@ export default function DashboardHeader({
   isOnline?: boolean, 
   isSyncing?: boolean 
 }) {
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [partnerName] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('nexora_partner_profile');
+      return saved ? JSON.parse(saved)?.name ?? 'Nexora Partner' : 'Nexora Partner';
+    } catch {
+      return 'Nexora Partner';
+    }
+  });
+
+  const [profileImage] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('nexora_partner_profile');
+      if (!saved) return null;
+      const profile = JSON.parse(saved);
+      return profile?.profileImage ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [showSyncDetailsModal, setShowSyncDetailsModal] = useState(false);
   
   // Last sync timestamp state
   const [lastSyncedAt, setLastSyncedAt] = useState<Date>(() => {
-    const saved = localStorage.getItem('nexora_last_sync_timestamp');
-    return saved ? new Date(saved) : new Date();
+    try {
+      const saved = localStorage.getItem('nexora_last_sync_timestamp');
+      if (saved) {
+        const parsed = new Date(saved);
+        // Guard against a corrupted value producing "Invalid Date" / NaN output.
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+    } catch (err) {
+      console.warn('Unable to read last sync timestamp:', err);
+    }
+    return new Date();
   });
 
   const [isInternalSyncing, setIsInternalSyncing] = useState(false);
   const isSyncing = externalSyncing || isInternalSyncing;
 
+  // Stamp a new sync time only on the falling edge of `isSyncing`
+  // (true -> false). The previous version also fired on mount, which reset the
+  // persisted timestamp to "Just now" on every page load and threw away the
+  // real last-sync time.
+  const wasSyncingRef = useRef(isSyncing);
   useEffect(() => {
-    const saved = localStorage.getItem('nexora_partner_profile');
-    if (saved) {
-      try {
-        const profile = JSON.parse(saved);
-        if (profile.profileImage) {
-          setProfileImage(profile.profileImage);
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-  }, []);
-
-  // Update lastSyncedAt when sync finishes
-  useEffect(() => {
-    if (!isSyncing) {
+    if (wasSyncingRef.current && !isSyncing) {
       const now = new Date();
       setLastSyncedAt(now);
-      localStorage.setItem('nexora_last_sync_timestamp', now.toISOString());
+      try {
+        localStorage.setItem('nexora_last_sync_timestamp', now.toISOString());
+      } catch (err) {
+        console.warn('Unable to persist last sync timestamp:', err);
+      }
     }
+    wasSyncingRef.current = isSyncing;
   }, [isSyncing]);
 
   const handleManualSync = () => {
@@ -141,7 +166,7 @@ export default function DashboardHeader({
 
   return (
     <header className="sticky top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs border-b border-gray-100">
-      <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+      <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
         <div className="flex flex-col min-w-0 justify-center">
           <h1 
             style={{
@@ -195,11 +220,13 @@ export default function DashboardHeader({
             className="w-9 h-9 rounded-full bg-[#b90064] text-white flex items-center justify-center font-bold text-sm overflow-hidden border-2 border-[#f0edec] cursor-pointer hover:opacity-95"
             title="View Profile"
           >
-            {profileImage ? (
-              <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              "RV"
-            )}
+            <Avatar
+              src={profileImage}
+              name={partnerName}
+              className="w-full h-full"
+              textClassName="text-sm text-white"
+              alt="Profile"
+            />
           </div>
           <button onClick={onLogout} className="w-9 h-9 rounded-full flex items-center justify-center text-[#5a3f47] hover:bg-[#fde7f3] transition-colors cursor-pointer" title="Log Out">
             <LogOut size={20} />

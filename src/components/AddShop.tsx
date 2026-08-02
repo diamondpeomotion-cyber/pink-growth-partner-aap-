@@ -24,24 +24,25 @@ import {
   Upload,
   Image as ImageIcon,
   Trash2,
-  RefreshCw,
   Sparkles,
   Building2,
   Globe,
   FileText,
   Lock,
   ShieldCheck,
-  Briefcase,
-  Save,
   Scissors,
 
-  IdCard,
   Info,
   AlertTriangle,
   Eye,
   FileBadge,
   Award
 } from 'lucide-react';
+import { createId } from '../utils/id';
+
+// Monotonic counter for toast ids - avoids Date.now() collisions when two
+// toasts are triggered inside the same millisecond.
+let docToastSeq = 0;
 
 export type GovtDocType = 'aadhaar_front' | 'aadhaar_back' | 'pan_card' | 'voter_id' | 'shop_front' | 'other';
 
@@ -55,6 +56,16 @@ export interface UploadedDocRecord {
   previewUrl: string | null;
   isImage: boolean;
   uploadedAt: string;
+}
+
+export interface SocialLinks {
+  facebook: string;
+  instagram: string;
+  youtube: string;
+  linkedin: string;
+  twitter: string;
+  snapchat: string;
+  googleBusiness: string;
 }
 
 export interface GovtDocSlotInfo {
@@ -112,17 +123,38 @@ const FORM_STEPS = [
   { id: 6, name: 'Review', icon: CheckCircle2, label: 'Review & Submit' },
 ];
 
+/**
+ * Reads the persisted "Add Shop" draft exactly once per component mount.
+ * Used for lazy `useState` initialisation so restored values are present on
+ * the very first render instead of being written in later from an effect
+ * (which made every field visibly flash from its default to the saved value).
+ */
+function readShopDraft(): Record<string, any> {
+  try {
+    const raw = localStorage.getItem('add_shop_form_draft');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (err) {
+    console.error('Failed to restore draft from localStorage:', err);
+    return {};
+  }
+}
+
 export default function AddShop({ onBack, onComplete }: { onBack: () => void, onComplete?: () => void }) {
-  const [currentStep, setCurrentStep] = useState<number>(2);
+  // Snapshot of the saved draft, read once during the first render.
+  const [draft] = useState(readShopDraft);
+
+  const [currentStep, setCurrentStep] = useState<number>(() => draft.currentStep ?? 1);
   const [showStepper, setShowStepper] = useState(true);
 
   // Step 1 State: Owner Details
-  const [ownerName, setOwnerName] = useState('Sunita Sharma');
-  const [mobileNumber, setMobileNumber] = useState('9876512345');
-  const [whatsappNumber, setWhatsappNumber] = useState('9876512345');
-  const [sameAsMobile, setSameAsMobile] = useState(true);
-  const [email, setEmail] = useState('sunita@glowbeauty.com');
-  const [preferredLang, setPreferredLang] = useState('hi');
+  const [ownerName, setOwnerName] = useState(() => draft.ownerName ?? 'Sunita Sharma');
+  const [mobileNumber, setMobileNumber] = useState(() => draft.mobileNumber ?? '9876512345');
+  const [whatsappNumber, setWhatsappNumber] = useState(() => draft.whatsappNumber ?? '9876512345');
+  const [sameAsMobile, setSameAsMobile] = useState(() => draft.sameAsMobile ?? true);
+  const [email, setEmail] = useState(() => draft.email ?? 'sunita@glowbeauty.com');
+  const [preferredLang, setPreferredLang] = useState(() => draft.preferredLang ?? 'hi');
   const [isVerified, setIsVerified] = useState(true);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpValues, setOtpValues] = useState(['1', '2', '3', '4', '5', '6']);
@@ -130,18 +162,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [draftSaved, setDraftSaved] = useState(false);
 
   // Step 2 State: Shop & Location Details
-  const [shopName, setShopName] = useState('Glow Beauty Parlour');
-  const [shopCategory, setShopCategory] = useState('Beauty Parlour');
+  const [shopName, setShopName] = useState(() => draft.shopName ?? 'Glow Beauty Parlour');
+  const [shopCategory, setShopCategory] = useState(() => draft.shopCategory ?? 'Beauty Parlour');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(true);
   
-  const [stateName, setStateName] = useState('Rajasthan');
-  const [districtName, setDistrictName] = useState('Jaipur');
-  const [cityName, setCityName] = useState('Jaipur');
-  const [localityName, setLocalityName] = useState('Mansarovar');
-  const [fullAddress, setFullAddress] = useState('72, Madhyam Marg, Mansarovar, Jaipur');
-  const [pincode, setPincode] = useState('302020');
-  const [landmark, setLandmark] = useState('Near Metro Station');
+  const [stateName, setStateName] = useState(() => draft.stateName ?? 'Rajasthan');
+  const [districtName, setDistrictName] = useState(() => draft.districtName ?? 'Jaipur');
+  const [cityName, setCityName] = useState(() => draft.cityName ?? 'Jaipur');
+  const [localityName, setLocalityName] = useState(() => draft.localityName ?? 'Mansarovar');
+  const [fullAddress, setFullAddress] = useState(() => draft.fullAddress ?? '72, Madhyam Marg, Mansarovar, Jaipur');
+  const [pincode, setPincode] = useState(() => draft.pincode ?? '302020');
+  const [landmark, setLandmark] = useState(() => draft.landmark ?? 'Near Metro Station');
 
   // Step 3 State: Business Details
   const [openingTime, setOpeningTime] = useState('10:00');
@@ -151,9 +183,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [startingPrice, setStartingPrice] = useState('300');
   const [yearsInBusiness, setYearsInBusiness] = useState('5');
   const [businessGenderType, setBusinessGenderType] = useState('Women');
-  const [gstin, setGstin] = useState('08AAAAA0000A1Z5');
-  const [businessType, setBusinessType] = useState('proprietorship');
-  const [annualTurnover, setAnnualTurnover] = useState('10l_25l');
+  const [gstin, setGstin] = useState(() => draft.gstin ?? '08AAAAA0000A1Z5');
+  const [businessType, setBusinessType] = useState(() => draft.businessType ?? 'proprietorship');
+  const [annualTurnover, setAnnualTurnover] = useState(() => draft.annualTurnover ?? '10l_25l');
   const [services, setServices] = useState([
     { name: 'Haircut', price: '400', duration: '30 mins' },
     { name: 'Facial', price: '1,200', duration: '60 mins' },
@@ -166,18 +198,15 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [newServiceDuration, setNewServiceDuration] = useState('');
 
   // Step 4 State: Website Setup & Branding
-  const [websiteUrl, setWebsiteUrl] = useState('https://glowbeautyparlour.com');
+  const [websiteUrl, setWebsiteUrl] = useState(() => draft.websiteUrl ?? 'https://glowbeautyparlour.com');
   const [isPublished, setIsPublished] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('store_is_published');
       if (saved !== null) return JSON.parse(saved);
-      const draft = localStorage.getItem('add_shop_form_draft');
-      if (draft) {
-        const parsed = JSON.parse(draft);
-        if (parsed.isPublished !== undefined) return parsed.isPublished;
-      }
-    } catch (e) {}
-    return true;
+    } catch (err) {
+      console.warn('Unable to read published flag:', err);
+    }
+    return draft.isPublished ?? true;
   });
 
   const handleTogglePublish = () => {
@@ -198,8 +227,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       triggerDocToast('info', 'Store Unpublished', 'Store is currently hidden from public.');
     }
   };
-  const [instagramHandle, setInstagramHandle] = useState('@glowbeauty_jaipur');
-  const [socialLinks, setSocialLinks] = useState({
+  const [instagramHandle, setInstagramHandle] = useState(() => draft.instagramHandle ?? '@glowbeauty_jaipur');
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(() => draft.socialLinks ?? {
     facebook: 'https://facebook.com/glowbeautyjaipur',
     instagram: 'https://instagram.com/glowbeauty_jaipur',
     youtube: 'https://youtube.com/@glowbeautyjaipur',
@@ -208,9 +237,11 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     snapchat: 'https://snapchat.com/add/glowbeautyjpr',
     googleBusiness: 'https://maps.app.goo.gl/glowbeautyjaipur',
   });
-  const [customLinks, setCustomLinks] = useState<{ id: string; title: string; url: string }[]>([
-    { id: 'c1', title: 'Online Appointment Booking', url: 'https://booking.glowbeauty.com' }
-  ]);
+  const [customLinks, setCustomLinks] = useState<{ id: string; title: string; url: string }[]>(
+    () => draft.customLinks ?? [
+      { id: 'c1', title: 'Online Appointment Booking', url: 'https://booking.glowbeauty.com' }
+    ]
+  );
   const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
 
   const validateSocialUrl = (platform: string, value: string): string => {
@@ -356,7 +387,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [previewTemplate, setPreviewTemplate] = useState<{ id: string, name: string, img: string, desc: string } | null>(null);
 
   // Step 5 State: Documents
-  const [panNumber, setPanNumber] = useState('ABCDE1234F');
+  const [panNumber, setPanNumber] = useState(() => draft.panNumber ?? 'ABCDE1234F');
   const [panUploaded, setPanUploaded] = useState(true);
   const [addressProofUploaded, setAddressProofUploaded] = useState(true);
   const [ownerIdProofFile, setOwnerIdProofFile] = useState<string | null>('owner-id-proof.jpg');
@@ -413,7 +444,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   } | null>(null);
 
   const triggerDocToast = (type: 'warning' | 'error' | 'success' | 'info', title: string, message: string) => {
-    const toastId = Date.now();
+    const toastId = ++docToastSeq;
     setDocToast({ id: toastId, type, title, message });
     setTimeout(() => {
       setDocToast(prev => (prev?.id === toastId ? null : prev));
@@ -499,7 +530,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     const formattedSize = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
 
     const newDocRecord: UploadedDocRecord = {
-      id: 'doc_' + Date.now(),
+      id: createId('doc'),
       type: targetType,
       typeLabel: targetTypeLabel,
       fileName: file.name,
@@ -583,7 +614,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
     const formattedSize = (sample.sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
     const newDocRecord: UploadedDocRecord = {
-      id: 'doc_' + Date.now(),
+      id: createId('doc'),
       type: targetType,
       typeLabel: targetTypeLabel,
       fileName: sample.name,
@@ -636,9 +667,12 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState<boolean>(false);
 
   // Photo Capture State
-  const [shopPhotos, setShopPhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=800&auto=format&fit=crop'
-  ]);
+  const [shopPhotos, setShopPhotos] = useState<string[]>(() => {
+    if (draft.shopPhotos !== undefined) return draft.shopPhotos;
+    // Legacy drafts stored a single photo under `shopPhoto`.
+    if (draft.shopPhoto !== undefined) return [draft.shopPhoto];
+    return ['https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=800&auto=format&fit=crop'];
+  });
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   
@@ -850,44 +884,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     setDupCheckStatus('success');
   };
 
-  // Restore saved draft on mount
-  useEffect(() => {
-    try {
-      const savedData = localStorage.getItem('add_shop_form_draft');
-      if (savedData) {
-        const parsed = JSON.parse(savedData);
-        if (parsed.ownerName !== undefined) setOwnerName(parsed.ownerName);
-        if (parsed.mobileNumber !== undefined) setMobileNumber(parsed.mobileNumber);
-        if (parsed.whatsappNumber !== undefined) setWhatsappNumber(parsed.whatsappNumber);
-        if (parsed.sameAsMobile !== undefined) setSameAsMobile(parsed.sameAsMobile);
-        if (parsed.email !== undefined) setEmail(parsed.email);
-        if (parsed.preferredLang !== undefined) setPreferredLang(parsed.preferredLang);
-        if (parsed.shopName !== undefined) setShopName(parsed.shopName);
-        if (parsed.shopCategory !== undefined) setShopCategory(parsed.shopCategory);
-        if (parsed.stateName !== undefined) setStateName(parsed.stateName);
-        if (parsed.districtName !== undefined) setDistrictName(parsed.districtName);
-        if (parsed.cityName !== undefined) setCityName(parsed.cityName);
-        if (parsed.localityName !== undefined) setLocalityName(parsed.localityName);
-        if (parsed.fullAddress !== undefined) setFullAddress(parsed.fullAddress);
-        if (parsed.pincode !== undefined) setPincode(parsed.pincode);
-        if (parsed.landmark !== undefined) setLandmark(parsed.landmark);
-        if (parsed.shopPhotos !== undefined) setShopPhotos(parsed.shopPhotos);
-        else if (parsed.shopPhoto !== undefined) setShopPhotos([parsed.shopPhoto]);
-        if (parsed.gstin !== undefined) setGstin(parsed.gstin);
-        if (parsed.businessType !== undefined) setBusinessType(parsed.businessType);
-        if (parsed.annualTurnover !== undefined) setAnnualTurnover(parsed.annualTurnover);
-        if (parsed.websiteUrl !== undefined) setWebsiteUrl(parsed.websiteUrl);
-        if (parsed.isPublished !== undefined) setIsPublished(parsed.isPublished);
-        if (parsed.instagramHandle !== undefined) setInstagramHandle(parsed.instagramHandle);
-        if (parsed.socialLinks !== undefined) setSocialLinks(parsed.socialLinks);
-        if (parsed.customLinks !== undefined) setCustomLinks(parsed.customLinks);
-        if (parsed.panNumber !== undefined) setPanNumber(parsed.panNumber);
-        if (parsed.currentStep !== undefined) setCurrentStep(parsed.currentStep);
-      }
-    } catch (e) {
-      console.error('Failed to restore draft from localStorage:', e);
-    }
-  }, []);
+  // NOTE: the saved draft is now restored via lazy useState initialisation
+  // above (see `readShopDraft`), so no restore effect is needed here.
+
 
   // Auto-save form field values to localStorage every 5 seconds
   useEffect(() => {

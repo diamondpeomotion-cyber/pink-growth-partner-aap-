@@ -1,28 +1,58 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSwipe } from './hooks/useSwipe';
 import { ArrowLeft } from 'lucide-react';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
-import AddShop from './components/AddShop';
 import ScanQRScreen from './components/dashboard/ScanQRScreen';
-import SupportScreen from './components/dashboard/SupportScreen';
-import RewardsScreen from './components/dashboard/RewardsScreen';
-import WebsiteSettingsScreen from './components/dashboard/WebsiteSettingsScreen';
-import WebsitePreviewScreen from './components/dashboard/WebsitePreviewScreen';
-import ProfileScreen from './components/dashboard/ProfileScreen';
-import AccountSettingsScreen from './components/dashboard/AccountSettingsScreen';
-import MyShopsScreen from './components/dashboard/MyShopsScreen';
-import ShopQualificationDetails from './components/dashboard/ShopQualificationDetails';
-import QREarningsScreen from './components/dashboard/QREarningsScreen';
-import ShopEarningsLedgerScreen from './components/dashboard/ShopEarningsLedgerScreen';
-import PayoutHistoryScreen from './components/dashboard/PayoutHistoryScreen';
-import PayoutsScreen from './components/dashboard/PayoutsScreen';
-import RewardDetailsScreen from './components/dashboard/RewardDetailsScreen';
 import TicketDetailsScreen from './components/dashboard/TicketDetailsScreen';
 import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
-import NotificationsScreen from './components/dashboard/NotificationsScreen';
 import OfflineNotificationBanner from './components/OfflineNotificationBanner';
+
+// Heavy route-level screens are code-split so the initial bundle only carries
+// the login + dashboard path instead of every screen in the app.
+const AddShop = lazy(() => import('./components/AddShop'));
+const MyShopsScreen = lazy(() => import('./components/dashboard/MyShopsScreen'));
+const ProfileScreen = lazy(() => import('./components/dashboard/ProfileScreen'));
+const WebsiteSettingsScreen = lazy(() => import('./components/dashboard/WebsiteSettingsScreen'));
+const RewardsScreen = lazy(() => import('./components/dashboard/RewardsScreen'));
+const ShopEarningsLedgerScreen = lazy(() => import('./components/dashboard/ShopEarningsLedgerScreen'));
+const RewardDetailsScreen = lazy(() => import('./components/dashboard/RewardDetailsScreen'));
+const ShopQualificationDetails = lazy(() => import('./components/dashboard/ShopQualificationDetails'));
+const NotificationsScreen = lazy(() => import('./components/dashboard/NotificationsScreen'));
+const PayoutsScreen = lazy(() => import('./components/dashboard/PayoutsScreen'));
+const QREarningsScreen = lazy(() => import('./components/dashboard/QREarningsScreen'));
+const PayoutHistoryScreen = lazy(() => import('./components/dashboard/PayoutHistoryScreen'));
+const AccountSettingsScreen = lazy(() => import('./components/dashboard/AccountSettingsScreen'));
+const WebsitePreviewScreen = lazy(() => import('./components/dashboard/WebsitePreviewScreen'));
+const SupportScreen = lazy(() => import('./components/dashboard/SupportScreen'));
+
+/**
+ * Screens that already render their own back arrow inside their header.
+ * For these the global floating back button must stay hidden, otherwise the
+ * user sees two overlapping back arrows in the top-left corner.
+ */
+const SCREENS_WITH_OWN_BACK_BUTTON = new Set([
+  'add-shop',
+  'website-settings',
+  'website-preview',
+  'account-settings',
+  'scan-qr',
+  'support',
+  'help-article',
+  'ticket-details',
+  'new-ticket',
+  'notifications',
+  'rewards',
+  'reward-details',
+  'profile',
+  'shops',
+  'shop-qualification',
+  'earnings',
+  'shop-earnings-ledger',
+  'payout-history',
+  'payouts',
+]);
 
 export const DEFAULT_PARTNER_PROFILE = {
   name: 'Rahul Verma',
@@ -45,10 +75,28 @@ export const DEFAULT_DASHBOARD_CACHE = {
   offlinePendingActionsCount: 0,
 };
 
+/** Lightweight placeholder shown while a code-split screen is downloading. */
+function ScreenLoader() {
+  return (
+    <div className="flex-1 min-h-[60vh] w-full flex flex-col items-center justify-center gap-3">
+      <div className="w-8 h-8 rounded-full border-2 border-pink-200 border-t-primary animate-spin" />
+      <p className="text-xs font-semibold text-gray-400">Loading…</p>
+    </div>
+  );
+}
+
 export default function App() {
   const swipeRef = useRef<HTMLDivElement>(null);
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Read the auth flag during initialisation. Doing this in an effect made the
+  // login screen flash for one frame on every reload for already-signed-in users.
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      return localStorage.getItem('isAuthenticated') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [history, setHistory] = useState<string[]>(['dashboard']);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -71,6 +119,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let syncTimer: ReturnType<typeof setTimeout> | undefined;
+
     const handleOnline = () => {
       setIsOnline(true);
       setIsSyncing(true);
@@ -89,7 +139,8 @@ export default function App() {
         console.error('Failed updating cache on network status change:', e);
       }
 
-      setTimeout(() => setIsSyncing(false), 2000);
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => setIsSyncing(false), 2000);
     };
 
     const handleOffline = () => {
@@ -99,28 +150,35 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    const channel = new BroadcastChannel('nexora_sync_channel');
-    channel.onmessage = (event) => {
-      if (event.data && event.data.type === 'SYNC_COMPLETE') {
-        setIsSyncing(false);
-        try {
-          const cache = localStorage.getItem('nexora_dashboard_cache');
-          const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
-          const updatedCache = {
-            ...parsedCache,
-            lastSyncTime: new Date().toISOString(),
-          };
-          localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
-        } catch (e) {
-          console.error('Failed syncing cache on broadcast:', e);
+    // BroadcastChannel is unavailable in some browsers (e.g. Safari < 15.4).
+    // Constructing it unguarded threw and aborted the whole effect, so the
+    // online/offline listeners were never cleaned up.
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('nexora_sync_channel');
+      channel.onmessage = (event) => {
+        if (event.data && event.data.type === 'SYNC_COMPLETE') {
+          setIsSyncing(false);
+          try {
+            const cache = localStorage.getItem('nexora_dashboard_cache');
+            const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
+            const updatedCache = {
+              ...parsedCache,
+              lastSyncTime: new Date().toISOString(),
+            };
+            localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
+          } catch (e) {
+            console.error('Failed syncing cache on broadcast:', e);
+          }
         }
-      }
-    };
+      };
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      channel.close();
+      clearTimeout(syncTimer);
+      channel?.close();
     };
   }, []);
 
@@ -150,13 +208,6 @@ export default function App() {
     threshold: 80,
   });
 
-
-  useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    if (isAuthenticated === 'true') {
-      setIsLoggedIn(true);
-    }
-  }, []);
 
   if (!isLoggedIn) {
     return (
@@ -317,7 +368,9 @@ export default function App() {
   return (
     <div ref={swipeRef} className="h-screen max-h-screen w-full flex flex-col bg-[#fcf9f8] overflow-hidden">
       <OfflineNotificationBanner isOnline={isOnline} />
-      {currentPage !== 'dashboard' && (
+      {/* Floating back button is only rendered for screens that do NOT provide
+          their own in-header back control, otherwise two stacked arrows appear. */}
+      {currentPage !== 'dashboard' && !SCREENS_WITH_OWN_BACK_BUTTON.has(currentPage) && (
         <div className="fixed top-0 left-0 z-[100] p-4 pointer-events-none">
           <button 
             onClick={goBack}
@@ -328,9 +381,11 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 md:pt-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         <div className="min-h-full w-full shadow-lg bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
-          {renderContent()}
+          <Suspense fallback={<ScreenLoader />}>
+            {renderContent()}
+          </Suspense>
         </div>
       </div>
     </div>

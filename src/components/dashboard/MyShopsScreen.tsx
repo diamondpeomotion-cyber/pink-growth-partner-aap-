@@ -10,22 +10,16 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   Clock,
   ArrowLeft,
   Plus,
   ChevronRight,
   ChevronLeft,
-  Info,
   Calendar,
   DollarSign,
   QrCode,
   X,
-  MapPin,
   Check,
-  User,
-  ExternalLink,
-  Smartphone,
   Sparkles,
   RefreshCw,
   Phone,
@@ -34,12 +28,8 @@ import {
   Tag,
   CheckSquare,
   Square,
-  ListChecks,
   Store,
-  SearchX,
-  FilterX,
-  Building2,
-  PlusCircle
+  SearchX
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 
@@ -448,7 +438,7 @@ export default function MyShopsScreen({
       
       {/* Top Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -485,7 +475,7 @@ export default function MyShopsScreen({
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-4 pb-16 px-[--page-margin]">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-4 pb-16 px-[var(--page-margin)]">
         
         {/* Toast Notification Banner */}
         {toastMsg && (
@@ -642,7 +632,7 @@ export default function MyShopsScreen({
         </p>
         
         {/* Horizontal Scrollable Filter Tabs */}
-        <div className="relative group/tabs mb-6 -mx-4">
+        <div className="relative group/tabs mb-6 -mx-[var(--page-margin)]">
           {showLeftArrow && (
             <button 
               onClick={() => scrollTabs('left')}
@@ -663,7 +653,7 @@ export default function MyShopsScreen({
 
           <div 
             ref={tabsScrollRef}
-            className="flex overflow-x-auto no-scrollbar gap-2 px-4 snap-x scroll-smooth"
+            className="flex overflow-x-auto no-scrollbar gap-2 px-[var(--page-margin)] snap-x scroll-smooth scroll-pl-[var(--page-margin)]"
           >
             {tabs.map((tab) => {
               const isActive = activeTab === tab.value;

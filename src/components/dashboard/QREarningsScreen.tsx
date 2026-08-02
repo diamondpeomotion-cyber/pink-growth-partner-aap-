@@ -12,11 +12,9 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  TrendingUp,
   X,
   Sparkles,
   ChevronRight,
-  Share2,
   AlertCircle
 } from 'lucide-react';
 import BottomNav from './BottomNav';
@@ -218,7 +216,7 @@ export default function QREarningsScreen({
 
       {/* Top Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs h-16">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
@@ -247,7 +245,7 @@ export default function QREarningsScreen({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[--page-margin] space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[var(--page-margin)] space-y-5">
         
         {/* Quality Audit Notice */}
         <section className="bg-pink-50/50 border border-pink-100/80 rounded-3xl p-4 flex gap-3 items-start shadow-2xs">

@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   User,
   Shield,
   CreditCard,
-  Award,
   Settings,
   Bell,
   CheckCircle,
@@ -16,23 +15,16 @@ import {
   Pause,
   ChevronRight,
   X,
-  Phone,
-  Mail,
-  Calendar,
-  MapPin,
   Download,
-  Check,
   Sparkles,
   Smartphone,
   Share2,
-  QrCode,
   Camera,
-  ExternalLink,
   CheckCircle2,
-  RotateCw,
-  Layers,
-  Eye
+  RotateCw
 } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
+import Avatar from '../Avatar';
 import BottomNav from './BottomNav';
 import InstallAppModal from '../InstallAppModal';
 
@@ -51,7 +43,7 @@ export default function ProfileScreen({
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {
+      } catch {
         // Fallback below
       }
     }
@@ -203,7 +195,7 @@ export default function ProfileScreen({
 
       {/* TopAppBar */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border-b border-gray-100 hidden md:block">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="font-bold text-xl text-[#b90064] tracking-tight cursor-pointer" onClick={() => onNavigate?.('dashboard')}>Nexora</div>
           <div className="flex items-center gap-4">
             <button aria-label="Settings" onClick={() => onNavigate?.('account-settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer">
@@ -214,7 +206,13 @@ export default function ProfileScreen({
               <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#b90064] rounded-full border border-white"></span>
             </button>
             <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 cursor-pointer" onClick={() => onNavigate?.('profile')}>
-              <img alt="Salon Owner Profile" className="w-full h-full object-cover" src={profile.profileImage || "https://lh3.googleusercontent.com/aida-public/AB6AXuAy6hBXYrmOKccJ8RjKAe7kpKClrr-9OypinMvvOA-LCNcjimH7jJbcj3DieYl_wz-RVBdcif-aDklQv8RYt45qr3Sk0pdq2P-dZ8gMvDB_EMjnyc3zJRXwFW6yvJDFjX898GvU4gXDlzJFGaij2t5iaE6hIodnoEnagr4jCr-arF0_Dsj-IEp0PusKkFAW92STh-4NU3yqtbMYNePhl4Jmq1979DzQnvLpt0U2xWQUS0B5eWRPw90S"} />
+              <Avatar
+                src={profile.profileImage}
+                name={profile.name}
+                className="w-full h-full"
+                textClassName="text-lg"
+                alt="Salon Owner Profile"
+              />
             </div>
           </div>
         </div>
@@ -222,7 +220,7 @@ export default function ProfileScreen({
 
       {/* Mobile Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/75 backdrop-blur-md shadow-sm border-b border-gray-100 md:hidden">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
             <button 
               onClick={onBack}
@@ -244,7 +242,7 @@ export default function ProfileScreen({
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-[--page-margin] pt-6">
+      <main className="max-w-screen-xl mx-auto px-[var(--page-margin)] pt-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column: Summary & Quick Actions */}
@@ -266,8 +264,13 @@ export default function ProfileScreen({
                   className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#FDE7F3] mb-3 relative group cursor-pointer shadow-sm hover:opacity-95 transition-all"
                   title="Click to update profile photo"
                 >
-                  <img alt={profile.name} className="w-full h-full object-cover" src={profile.profileImage} />
-                  <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center transition-opacity">
+                  <Avatar
+                    src={profile.profileImage}
+                    name={profile.name}
+                    className="w-full h-full"
+                    textClassName="text-2xl"
+                  />
+                  <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none">
                     <div className="bg-primary/90 text-white p-1.5 rounded-full shadow-md">
                       <Camera size={16} />
                     </div>
@@ -448,14 +451,14 @@ export default function ProfileScreen({
                 <div className="space-y-1 bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
                   <p className="text-[10px] text-[#5a3f47] uppercase tracking-wider font-bold flex items-center gap-1">
                     Legal Name 
-                    <Lock size={10} className="text-gray-400" title="Locked by KYC" />
+                    <span title="Locked by KYC" className="inline-flex"><Lock size={10} className="text-gray-400" /></span>
                   </p>
                   <p className="text-sm font-extrabold text-[#1b1c1b]">{profile.name}</p>
                 </div>
                 <div className="space-y-1 bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
                   <p className="text-[10px] text-[#5a3f47] uppercase tracking-wider font-bold flex items-center gap-1">
                     Date of Birth 
-                    <Lock size={10} className="text-gray-400" title="Locked by KYC" />
+                    <span title="Locked by KYC" className="inline-flex"><Lock size={10} className="text-gray-400" /></span>
                   </p>
                   <p className="text-sm font-extrabold text-[#1b1c1b]">{formatDateString(profile.dob)}</p>
                 </div>
@@ -1000,12 +1003,12 @@ export default function ProfileScreen({
                             if (e.name === 'AbortError') return;
                           }
                         }
-                        try {
-                          await navigator.clipboard.writeText(shareUrl);
-                          triggerToast('Partner Card verification link copied to clipboard!');
-                        } catch (err) {
-                          triggerToast('Partner ID: GP-JPR-1024');
-                        }
+                        const copied = await copyToClipboard(shareUrl);
+                        triggerToast(
+                          copied
+                            ? 'Partner Card verification link copied to clipboard!'
+                            : 'Partner ID: GP-JPR-1024'
+                        );
                       }}
                       className="flex-1 h-12 rounded-xl bg-[#FDE7F3] text-[#b90064] text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FDE7F3]/80 transition-all cursor-pointer active:scale-98"
                     >
@@ -1096,10 +1099,12 @@ export default function ProfileScreen({
                   <button
                     onClick={async () => {
                       const url = `https://glowbeauty.nexora.shop/verify/GP-JPR-1024?name=${encodeURIComponent(profile.name)}`;
-                      if (navigator.clipboard) {
-                        await navigator.clipboard.writeText(url);
-                        triggerToast('Verification payload URL copied to clipboard!');
-                      }
+                      const copied = await copyToClipboard(url);
+                      triggerToast(
+                        copied
+                          ? 'Verification payload URL copied to clipboard!'
+                          : `Verification URL: ${url}`
+                      );
                     }}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >

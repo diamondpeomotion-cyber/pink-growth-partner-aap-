@@ -10,7 +10,6 @@ import {
   Clock,
   CheckCircle2,
   Bell,
-  Archive,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
@@ -20,7 +19,6 @@ import {
   Search,
   Check,
   Trash2,
-  Sparkles,
   Inbox
 } from 'lucide-react';
 import BottomNav from './BottomNav';
@@ -272,7 +270,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
       
       {/* Top Header */}
       <header className="sticky top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs border-b border-gray-100">
-        <div className="flex items-center justify-between px-[--page-margin] h-16 w-full max-w-screen-xl mx-auto gap-2">
+        <div className="flex items-center justify-between px-[var(--page-margin)] h-16 w-full max-w-screen-xl mx-auto gap-2">
           <button 
             onClick={onBack}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 transition-colors active:scale-95 text-[#b90064] cursor-pointer shrink-0"
@@ -324,7 +322,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
 
           <div 
             ref={scrollRef}
-            className="w-full max-w-screen-xl mx-auto px-[--page-margin] overflow-x-auto no-scrollbar py-2.5 flex items-center gap-2 scroll-smooth"
+            className="w-full max-w-screen-xl mx-auto px-[var(--page-margin)] overflow-x-auto no-scrollbar py-2.5 flex items-center gap-2 scroll-smooth"
           >
             {CATEGORY_TABS.map((tab) => {
               const TabIcon = tab.icon;
@@ -359,7 +357,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
         </div>
 
         {/* Search Bar & Unread Filter Sub-bar */}
-        <div className="w-full max-w-screen-xl mx-auto px-[--page-margin] py-2.5 flex items-center gap-2 border-t border-gray-100 bg-white">
+        <div className="w-full max-w-screen-xl mx-auto px-[var(--page-margin)] py-2.5 flex items-center gap-2 border-t border-gray-100 bg-white">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -386,7 +384,7 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
       </header>
 
       {/* Main Content List */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[--page-margin] py-5 flex flex-col gap-3">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto px-[var(--page-margin)] py-5 flex flex-col gap-3">
         <AnimatePresence mode="popLayout">
           {filteredNotifications.length > 0 ? (
             filteredNotifications.map((notif, idx) => (

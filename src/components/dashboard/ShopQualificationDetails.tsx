@@ -1,26 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowLeft,
   Bell,
   MoreVertical,
   CheckCircle2,
   Calendar,
-  DollarSign,
-  QrCode,
   Phone,
   MessageSquare,
   AlertCircle,
-  TrendingUp,
   Info,
-  ChevronRight,
   Plus,
-  RefreshCw,
-  FileText,
   Clock,
   Sparkles,
-  Award,
-  HelpCircle
+  Award
 } from 'lucide-react';
+import { createId, createNumericRef } from '../../utils/id';
 
 interface Transaction {
   id: string;
@@ -51,7 +45,7 @@ export default function ShopQualificationDetails({
   ]);
 
   // Streak logs for the 15-day cycle
-  const [dayLogs, setDayLogs] = useState<DayLog[]>([
+  const [dayLogs] = useState<DayLog[]>([
     { day: 1, date: '18 Jul', amount: 1320, status: 'Passed' },
     { day: 2, date: '19 Jul', amount: 1050, status: 'Passed' },
     { day: 3, date: '20 Jul', amount: 1200, status: 'Passed' },
@@ -81,21 +75,14 @@ export default function ShopQualificationDetails({
   const isTodayPassed = todaySum >= targetMin;
   const deficit = isTodayPassed ? 0 : targetMin - todaySum;
 
-  // Sync today's sum with Day 9 in dayLogs
-  useEffect(() => {
-    setDayLogs(prevLogs =>
-      prevLogs.map(log => {
-        if (log.day === 9) {
-          return {
-            ...log,
-            amount: todaySum,
-            status: todaySum >= targetMin ? 'Passed' : 'Pending',
-          };
-        }
-        return log;
-      })
-    );
-  }, [todaySum]);
+  // Day 9 mirrors today's live transaction total, so derive it during render
+  // instead of writing it back into state from an effect (which caused an
+  // extra render pass and could briefly show a stale amount).
+  const dayLogsWithToday = dayLogs.map(log =>
+    log.day === 9
+      ? { ...log, amount: todaySum, status: todaySum >= targetMin ? 'Passed' : 'Pending' }
+      : log
+  );
 
   // Simulate a new transaction
   const handleSimulatePayment = () => {
@@ -103,11 +90,11 @@ export default function ShopQualificationDetails({
     if (isNaN(amt) || amt <= 0) return;
 
     const newTx: Transaction = {
-      id: Math.random().toString(),
+      id: createId('tx'),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       amount: amt,
       status: 'Successful',
-      utr: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+      utr: createNumericRef(12),
     };
 
     setTodayTransactions([newTx, ...todayTransactions]);
@@ -154,7 +141,7 @@ export default function ShopQualificationDetails({
 
       {/* Top App Bar */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-xs">
-        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[--page-margin] h-16">
+        <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
@@ -169,7 +156,7 @@ export default function ShopQualificationDetails({
           </div>
           <div className="flex items-center gap-1.5">
             <button 
-              onClick={() => onNavigate('notifications')}
+              onClick={() => onNavigate?.('notifications')}
               className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all relative"
             >
               <Bell size={18} />
@@ -186,7 +173,7 @@ export default function ShopQualificationDetails({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[--page-margin] space-y-5">
+      <main className="flex-1 w-full max-w-screen-xl mx-auto pt-6 pb-16 px-[var(--page-margin)] space-y-5">
 
         {/* 1. Shop Hero & Quick Summary */}
         <section className="bg-white rounded-3xl p-4 shadow-sm border border-gray-200/60 flex gap-4 items-center">
@@ -259,7 +246,7 @@ export default function ShopQualificationDetails({
 
             {/* Overall streak tracker indicators */}
             <div className="grid grid-cols-15 gap-1 mt-3">
-              {dayLogs.map((log) => (
+              {dayLogsWithToday.map((log) => (
                 <div
                   key={log.day}
                   title={`Day ${log.day}: ₹${log.amount} (${log.status})`}
@@ -331,7 +318,7 @@ export default function ShopQualificationDetails({
               </h4>
 
               <div className="grid grid-cols-5 gap-3">
-                {dayLogs.map((log) => {
+                {dayLogsWithToday.map((log) => {
                   const isCurrent = log.day === 9;
                   const isPassed = log.status === 'Passed';
                   

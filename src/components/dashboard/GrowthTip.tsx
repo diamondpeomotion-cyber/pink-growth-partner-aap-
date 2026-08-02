@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Sparkles, Lightbulb, TrendingUp, Users, Quote } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -54,13 +54,10 @@ const GROWTH_TIPS = [
 ];
 
 export default function GrowthTip() {
-  const [tip, setTip] = useState(GROWTH_TIPS[0]);
-
-  useEffect(() => {
-    // Select a random tip on mount
-    const randomIndex = Math.floor(Math.random() * GROWTH_TIPS.length);
-    setTip(GROWTH_TIPS[randomIndex]);
-  }, []);
+  // Pick the random tip once during lazy state initialisation instead of in an
+  // effect. Doing it in an effect caused an extra render pass and made the tip
+  // visibly "flip" from the first entry to the random one on every mount.
+  const [tip] = useState(() => GROWTH_TIPS[Math.floor(Math.random() * GROWTH_TIPS.length)]);
 
   const Icon = tip.icon;
 

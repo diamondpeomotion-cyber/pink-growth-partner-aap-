@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, TrendingUp, DollarSign, QrCode } from 'lucide-react';
+import { BarChart3, DollarSign, QrCode } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const data = [

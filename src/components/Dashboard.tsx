@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getItem, setItem } from '../utils/db';
+import { getItem } from '../utils/db';
 
 import DashboardHeader from './dashboard/DashboardHeader';
 import EarningsCard from './dashboard/EarningsCard';
@@ -67,7 +67,7 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
       <DashboardHeader onLogout={onLogout} onNavigate={onNavigate} isOnline={isOnline} isSyncing={isSyncing} />
-      <main className="flex-1 w-full pt-4 pb-16 px-[--page-margin] max-w-screen-xl mx-auto space-y-5">
+      <main className="flex-1 w-full pt-4 pb-16 px-[var(--page-margin)] max-w-screen-xl mx-auto space-y-5">
         {/* Partner Header */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 sm:px-6 py-1">
             <div className="flex flex-col">

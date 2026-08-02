@@ -7,8 +7,7 @@ import {
   Compass, 
   Navigation2, 
   ExternalLink,
-  CheckCircle2,
-  RefreshCw
+  CheckCircle2
 } from 'lucide-react';
 
 interface MapPreviewProps {
