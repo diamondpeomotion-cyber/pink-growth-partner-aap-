@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { copyToClipboard } from '../../utils/clipboard';
 import Avatar from '../Avatar';
+import { toPng } from 'html-to-image';
 import BottomNav from './BottomNav';
 import InstallAppModal from '../InstallAppModal';
 
@@ -85,6 +86,62 @@ export default function ProfileScreen({
   // Keep track of active modals
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isIdOpen, setIsIdOpen] = useState(false);
+  // Wraps whichever card variant is on screen so it can be rasterised to PNG.
+  const idCardCaptureRef = useRef<HTMLDivElement>(null);
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+
+  /**
+   * Rasterises the on-screen ID card to a high-resolution PNG and saves it.
+   *
+   * The button used to only fire a toast claiming the card had been
+   * downloaded - no file was ever produced.
+   */
+  const handleDownloadIdCard = async () => {
+    const node = idCardCaptureRef.current;
+    if (!node || isDownloadingCard) return;
+
+    setIsDownloadingCard(true);
+    try {
+      const dataUrl = await toPng(node, {
+        // 3x keeps the text crisp when the card is printed or zoomed.
+        pixelRatio: 3,
+        cacheBust: true,
+        // The Google Fonts stylesheets are cross-origin, so their cssRules
+        // cannot be read and inlining them only logs SecurityErrors. The fonts
+        // are already applied to the live DOM being cloned, so skip the fetch.
+        skipFonts: true,
+        // Fills the rounded corners instead of leaving them transparent-black.
+        backgroundColor: idCardFormat === 'atm' ? '#1a000d' : '#ffffff',
+        // A remote avatar that refuses CORS would taint the canvas and abort
+        // the whole export, so drop images we cannot safely read.
+        filter: (el) => {
+          if (!(el instanceof HTMLImageElement)) return true;
+          const src = el.currentSrc || el.src || '';
+          return src.startsWith('data:') || src.startsWith(window.location.origin);
+        },
+      });
+
+      const safeName = (profile.name || 'partner')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9-]/g, '');
+      const variant = idCardFormat === 'atm' ? `atm-${idCardSide}` : 'badge';
+
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `Nexora-Partner-Card-${safeName}-${variant}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      triggerToast('Partner card saved as a high-resolution PNG.');
+    } catch (err) {
+      console.error('Unable to export the partner ID card:', err);
+      triggerToast('Could not generate the card image. Please try again.');
+    } finally {
+      setIsDownloadingCard(false);
+    }
+  };
   const [idCardFormat, setIdCardFormat] = useState<'atm' | 'badge'>('atm');
   const [idCardSide, setIdCardSide] = useState<'front' | 'back'>('front');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
@@ -732,6 +789,9 @@ export default function ProfileScreen({
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 className="w-full flex flex-col items-center"
               >
+                {/* Capture target: wraps only the card, so the footer action
+                    bar is never baked into the exported PNG. */}
+                <div ref={idCardCaptureRef} className="w-full flex flex-col items-center">
                 {/* 1. ATM CARD FORMAT (LANDSCAPE CR80 SPECIFICATION) */}
                 {idCardFormat === 'atm' ? (
                   <div className="w-full max-w-[440px] aspect-[1.586/1] rounded-[22px] p-4 sm:p-5 relative overflow-hidden shadow-[0px_25px_60px_rgba(0,0,0,0.5)] border-2 border-amber-300/40 text-white transition-all flex flex-col justify-between bg-gradient-to-br from-[#3b001d] via-[#a30058] to-[#1a000d]">
@@ -780,10 +840,11 @@ export default function ProfileScreen({
                         <div className="flex items-center gap-3.5 my-auto z-10 pt-1">
                           {/* Profile Photo */}
                           <div className="w-20 h-24 sm:w-22 sm:h-26 rounded-xl border-2 border-amber-300/80 shadow-lg overflow-hidden bg-white shrink-0 p-0.5 relative group">
-                            <img
-                              alt={profile.name}
-                              src={profile.profileImage || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop"}
-                              className="w-full h-full object-cover object-center rounded-lg"
+                            <Avatar
+                              src={profile.profileImage}
+                              name={profile.name}
+                              className="w-full h-full !rounded-lg"
+                              textClassName="text-2xl"
                             />
                             <div className="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-[8px] font-extrabold text-white text-center py-0.5 uppercase tracking-wider">
                               VERIFIED
@@ -831,7 +892,7 @@ export default function ProfileScreen({
                         {/* Bottom Row: Embossed Card Number & Member Details */}
                         <div className="flex items-end justify-between border-t border-amber-300/20 pt-1.5 z-10">
                           <div>
-                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold">
+                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold whitespace-nowrap">
                               Partner ID / Smart Card No.
                             </span>
                             <span className="font-mono text-xs sm:text-sm font-black tracking-widest text-amber-200 drop-shadow-sm">
@@ -840,7 +901,7 @@ export default function ProfileScreen({
                           </div>
 
                           <div className="text-right">
-                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold">
+                            <span className="text-[8px] text-amber-200/60 uppercase tracking-widest block font-bold whitespace-nowrap">
                               Member Since
                             </span>
                             <span className="text-[10px] sm:text-[11px] font-bold text-white">
@@ -908,10 +969,12 @@ export default function ProfileScreen({
                     <div className="p-6 pt-0 flex flex-col items-center relative">
                       {/* Avatar */}
                       <div className="w-28 h-28 rounded-full border-4 border-white shadow-md -mt-14 overflow-hidden relative z-10 mb-3 bg-white p-0.5 flex items-center justify-center shrink-0">
-                        <img 
-                          alt={profile.name + " Photo"} 
-                          className="w-full h-full object-cover object-center rounded-full" 
-                          src={profile.profileImage || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=300&auto=format&fit=crop"} 
+                        <Avatar
+                          src={profile.profileImage}
+                          name={profile.name}
+                          className="w-full h-full"
+                          textClassName="text-3xl"
+                          alt={profile.name + " Photo"}
                         />
                       </div>
 
@@ -952,6 +1015,7 @@ export default function ProfileScreen({
                     </div>
                   </div>
                 )}
+                </div>
 
                 {/* Footer Action Bar */}
                 <div className="w-full max-w-[440px] mt-4 bg-white rounded-2xl p-4 flex flex-col gap-2.5 shadow-xl border border-gray-100">
@@ -980,11 +1044,21 @@ export default function ProfileScreen({
                   <div className="flex gap-2">
                     <button 
                       type="button"
-                      onClick={() => triggerToast('Digital ATM ID Card downloaded as high-res PNG image.')}
-                      className="flex-1 h-12 rounded-xl bg-[#b90064] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#b90064]/90 transition-all cursor-pointer shadow-sm active:scale-98"
+                      onClick={handleDownloadIdCard}
+                      disabled={isDownloadingCard}
+                      className="flex-1 h-12 rounded-xl bg-[#b90064] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#b90064]/90 transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-60 disabled:cursor-wait disabled:active:scale-100"
                     >
-                      <Download size={16} />
-                      Download Card
+                      {isDownloadingCard ? (
+                        <>
+                          <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                          Preparing…
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Download Card
+                        </>
+                      )}
                     </button>
                     <button 
                       type="button"
