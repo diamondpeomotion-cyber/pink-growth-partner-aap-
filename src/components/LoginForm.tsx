@@ -1,9 +1,50 @@
-
 import React, { useState } from 'react';
-import { Eye, EyeOff, User, Lock, AlertCircle, Mail, CheckCircle2, X } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  AlertCircle,
+  Mail,
+  CheckCircle2,
+  X,
+  Phone,
+  MapPin,
+  UserPlus,
+  LogIn,
+  ShieldCheck,
+} from 'lucide-react';
+import { createNumericRef } from '../utils/id';
+
+type AuthMode = 'login' | 'signup';
+
+const PARTNER_PROFILE_KEY = 'nexora_partner_profile';
+const REGISTERED_PARTNERS_KEY = 'nexora_registered_partners';
+
+interface SignupErrors {
+  fullName?: string;
+  mobile?: string;
+  email?: string;
+  city?: string;
+  password?: string;
+  confirmPassword?: string;
+  terms?: string;
+}
+
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const isValidMobile = (v: string) => /^\d{10}$/.test(v.trim());
+
+/** Builds a partner code like NX-JA-4821 from the partner's city. */
+function buildAgentCode(city: string): string {
+  const letters = (city.replace(/[^a-zA-Z]/g, '').slice(0, 2) || 'IN').toUpperCase();
+  return `NX-${letters}-${createNumericRef(4)}`;
+}
 
 export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => void }) {
+  const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
+
+  // ---------------- Login state ----------------
   // Read the remembered username during lazy initialisation so the input is
   // already populated on the very first paint (no empty-then-filled flash).
   const [username, setUsername] = useState(() => {
@@ -23,46 +64,168 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
   });
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [passwordStrength, setPasswordStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
-  const [message, setMessage] = useState<{ type: 'error' | 'warning' | 'info'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; text: string } | null>(null);
 
-  // Forgot password modal state
+  // ---------------- Sign up state ----------------
+  const [suName, setSuName] = useState('');
+  const [suMobile, setSuMobile] = useState('');
+  const [suEmail, setSuEmail] = useState('');
+  const [suCity, setSuCity] = useState('');
+  const [suPassword, setSuPassword] = useState('');
+  const [suConfirm, setSuConfirm] = useState('');
+  const [suTerms, setSuTerms] = useState(false);
+  const [suErrors, setSuErrors] = useState<SignupErrors>({});
+  const [suSubmitting, setSuSubmitting] = useState(false);
+  const [suStrength, setSuStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
+
+  // ---------------- Forgot password state ----------------
   const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [resetError, setResetError] = useState('');
 
   const validateUsername = (val: string) => {
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-    const isMobile = /^\d{10}$/.test(val);
-    return (!isEmail && !isMobile) ? 'Please enter a valid 10-digit mobile number or email.' : '';
+    return (!isValidEmail(val) && !isValidMobile(val))
+      ? 'Please enter a valid 10-digit mobile number or email.'
+      : '';
   };
+
+  const scorePassword = (val: string) => ({
+    minLength: val.length >= 6,
+    hasNumber: /\d/.test(val),
+    hasUpper: /[A-Z]/.test(val),
+  });
 
   const checkPasswordStrength = (val: string) => {
-    setPasswordStrength({
-      minLength: val.length >= 6,
-      hasNumber: /\d/.test(val),
-      hasUpper: /[A-Z]/.test(val),
-    });
-    return (val.length < 6 || !/\d/.test(val) || !/[A-Z]/.test(val)) ? 'Password does not meet complexity requirements.' : '';
+    const s = scorePassword(val);
+    setPasswordStrength(s);
+    return (!s.minLength || !s.hasNumber || !s.hasUpper)
+      ? 'Password does not meet complexity requirements.'
+      : '';
   };
 
+  const switchMode = (next: AuthMode) => {
+    setMode(next);
+    setMessage(null);
+    setShowPassword(false);
+    setErrors({ username: '', password: '' });
+    setSuErrors({});
+  };
+
+  // ---------------- Login submit ----------------
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const usernameError = validateUsername(username);
     const passwordError = checkPasswordStrength(password);
-    
+
     if (usernameError || passwordError) {
       setErrors({ username: usernameError, password: passwordError });
       return;
     }
-    
-    // Proceed with login without credential check
+
     if (rememberMe) {
       localStorage.setItem('rememberedUsername', username);
     } else {
       localStorage.removeItem('rememberedUsername');
     }
     onLoginSuccess();
+  };
+
+  // ---------------- Sign up submit ----------------
+  const validateSignup = (): SignupErrors => {
+    const next: SignupErrors = {};
+
+    if (!suName.trim()) next.fullName = 'Please enter your full name.';
+    else if (suName.trim().length < 3) next.fullName = 'Name must be at least 3 characters.';
+
+    if (!suMobile.trim()) next.mobile = 'Please enter your mobile number.';
+    else if (!isValidMobile(suMobile)) next.mobile = 'Enter a valid 10-digit mobile number.';
+
+    if (!suEmail.trim()) next.email = 'Please enter your email address.';
+    else if (!isValidEmail(suEmail)) next.email = 'Enter a valid email address.';
+
+    if (!suCity.trim()) next.city = 'Please enter your city.';
+
+    const s = scorePassword(suPassword);
+    if (!suPassword) next.password = 'Please create a password.';
+    else if (!s.minLength || !s.hasNumber || !s.hasUpper) {
+      next.password = 'Password must meet all requirements below.';
+    }
+
+    if (!suConfirm) next.confirmPassword = 'Please confirm your password.';
+    else if (suConfirm !== suPassword) next.confirmPassword = 'Passwords do not match.';
+
+    if (!suTerms) next.terms = 'Please accept the Partner Terms to continue.';
+
+    return next;
+  };
+
+  const handleSignup = (e: React.FormEvent) => {
+    e.preventDefault();
+    const found = validateSignup();
+    setSuErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    // Reject a duplicate registration on this device.
+    let existing: Array<{ mobile?: string; email?: string }> = [];
+    try {
+      const raw = localStorage.getItem(REGISTERED_PARTNERS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) existing = parsed;
+    } catch {
+      existing = [];
+    }
+
+    const mobile = suMobile.trim();
+    const email = suEmail.trim().toLowerCase();
+    const clash = existing.find(
+      (p) => p.mobile === mobile || (p.email || '').toLowerCase() === email
+    );
+    if (clash) {
+      setSuErrors({
+        mobile: clash.mobile === mobile ? 'This mobile number is already registered.' : undefined,
+        email: (clash.email || '').toLowerCase() === email ? 'This email is already registered.' : undefined,
+      });
+      return;
+    }
+
+    setSuSubmitting(true);
+
+    const name = suName.trim().replace(/\s+/g, ' ');
+    const city = suCity.trim();
+    const profile = {
+      name,
+      mobile,
+      email,
+      city,
+      agentCode: buildAgentCode(city),
+      upiId: '',
+      joinedDate: new Date().toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+      status: 'Active Partner',
+    };
+
+    try {
+      // Overwrite the seeded demo profile so the dashboard greets the new
+      // partner rather than the placeholder account.
+      localStorage.setItem(PARTNER_PROFILE_KEY, JSON.stringify(profile));
+      localStorage.setItem(
+        REGISTERED_PARTNERS_KEY,
+        JSON.stringify([...existing, { mobile, email, name }])
+      );
+      localStorage.setItem('rememberedUsername', mobile);
+    } catch (err) {
+      console.warn('Unable to persist the new partner profile:', err);
+    }
+
+    // Brief pause so the button's pending state is visible.
+    setTimeout(() => {
+      setSuSubmitting(false);
+      onLoginSuccess();
+    }, 900);
   };
 
   const handleOpenForgot = () => {
@@ -80,91 +243,369 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     }
     setResetError('');
     setResetStatus('sending');
-
-    setTimeout(() => {
-      setResetStatus('sent');
-    }, 1200);
+    setTimeout(() => setResetStatus('sent'), 1200);
   };
+
+  const fieldWrap = (hasError?: string) =>
+    `flex items-center bg-[#f0edec] rounded-[14px] h-[56px] px-4 border ${
+      hasError ? 'border-[#93000a]' : 'border-transparent'
+    } focus-within:border-[#b90064] focus-within:shadow-[0_0_0_4px_rgba(185,0,100,0.1)] transition-all`;
+
+  const inputCls =
+    'bg-transparent border-none outline-none w-full text-base text-[#1b1c1b] placeholder:text-[#5a3f47]/50';
 
   return (
     <div className="bg-white rounded-[18px] p-6 w-full shadow-[0px_4px_20px_rgba(0,0,0,0.03)] border border-[#e4e2e1] relative">
+      {/* Mode switcher */}
+      <div
+        className="flex items-center gap-1 p-1 bg-[#f0edec] rounded-[14px] mb-5"
+        role="tablist"
+        aria-label="Choose login or sign up"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'login'}
+          onClick={() => switchMode('login')}
+          className={`flex-1 h-11 rounded-[11px] text-sm font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mode === 'login'
+              ? 'bg-white text-[#b90064] shadow-sm'
+              : 'text-[#5a3f47] hover:text-[#b90064]'
+          }`}
+        >
+          <LogIn size={16} />
+          Login
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'signup'}
+          onClick={() => switchMode('signup')}
+          className={`flex-1 h-11 rounded-[11px] text-sm font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mode === 'signup'
+              ? 'bg-white text-[#b90064] shadow-sm'
+              : 'text-[#5a3f47] hover:text-[#b90064]'
+          }`}
+        >
+          <UserPlus size={16} />
+          Sign Up
+        </button>
+      </div>
+
       {message && (
-        <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${message.type === 'error' ? 'bg-[#ffdad6] text-[#93000a]' : 'bg-[#fde7f3] text-[#b90064]'}`}>
+        <div
+          className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
+            message.type === 'error'
+              ? 'bg-[#ffdad6] text-[#93000a]'
+              : message.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800'
+              : 'bg-[#fde7f3] text-[#b90064]'
+          }`}
+        >
           <AlertCircle size={18} />
           <span className="text-sm">{message.text}</span>
         </div>
       )}
-      <form className="space-y-4" onSubmit={handleLogin}>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-[#5a3f47]">Mobile Number or Email</label>
-          <div className={`flex items-center bg-[#f0edec] rounded-[14px] h-[56px] px-4 border ${errors.username ? 'border-[#93000a]' : 'border-transparent'} focus-within:border-[#b90064] focus-within:shadow-[0_0_0_4px_rgba(185,0,100,0.1)] transition-all`}>
-            <User className="text-[#5a3f47] mr-2" size={20} />
-            <input 
-              className="bg-transparent border-none outline-none w-full text-base text-[#1b1c1b] placeholder:text-[#5a3f47]/50" 
-              placeholder="Enter details" 
-              type="text" 
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                setErrors(prev => ({ ...prev, username: validateUsername(e.target.value) }));
-              }}
-            />
+
+      {/* ------------------------------- LOGIN ------------------------------- */}
+      {mode === 'login' && (
+        <form className="space-y-4" onSubmit={handleLogin} noValidate>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Mobile Number or Email</label>
+            <div className={fieldWrap(errors.username)}>
+              <User className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="Enter details"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setErrors((prev) => ({ ...prev, username: validateUsername(e.target.value) }));
+                }}
+              />
+            </div>
+            {errors.username && <p className="text-xs text-[#93000a] mt-1">{errors.username}</p>}
           </div>
-          {errors.username && <p className="text-xs text-[#93000a] mt-1">{errors.username}</p>}
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-[#5a3f47]">Password</label>
-          <div className={`flex items-center bg-[#f0edec] rounded-[14px] h-[56px] px-4 border ${errors.password ? 'border-[#93000a]' : 'border-transparent'} focus-within:border-[#b90064] focus-within:shadow-[0_0_0_4px_rgba(185,0,100,0.1)] transition-all`}>
-            <Lock className="text-[#5a3f47] mr-2" size={20} />
-            <input 
-              className="bg-transparent border-none outline-none w-full text-base text-[#1b1c1b] placeholder:text-[#5a3f47]/50" 
-              placeholder="Enter password" 
-              type={showPassword ? 'text' : 'password'} 
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setErrors(prev => ({ ...prev, password: checkPasswordStrength(e.target.value) }));
-              }}
-            />
-            <button className="ml-2 text-[#b90064] cursor-pointer" type="button" onClick={() => setShowPassword(!showPassword)}>
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Password</label>
+            <div className={fieldWrap(errors.password)}>
+              <Lock className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="Enter password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrors((prev) => ({ ...prev, password: checkPasswordStrength(e.target.value) }));
+                }}
+              />
+              <button
+                className="ml-2 text-[#b90064] cursor-pointer"
+                type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {errors.password && <p className="text-xs text-[#93000a] mt-1">{errors.password}</p>}
+            <div className="text-xs space-y-1 mt-2">
+              <p className={passwordStrength.minLength ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• Min 6 characters</p>
+              <p className={passwordStrength.hasNumber ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one number</p>
+              <p className={passwordStrength.hasUpper ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one uppercase letter</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                className="h-5 w-5 text-[#b90064] border-[#8e6f77] rounded-full"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span className="text-sm text-[#5a3f47]">Remember Me</span>
+            </label>
+            <button
+              type="button"
+              onClick={handleOpenForgot}
+              className="text-sm font-medium text-[#b90064] hover:underline cursor-pointer"
+            >
+              Forgot Password?
             </button>
           </div>
-          {errors.password && <p className="text-xs text-[#93000a] mt-1">{errors.password}</p>}
-          <div className="text-xs space-y-1 mt-2">
-            <p className={passwordStrength.minLength ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• Min 6 characters</p>
-            <p className={passwordStrength.hasNumber ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one number</p>
-            <p className={passwordStrength.hasUpper ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one uppercase letter</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input 
-              className="h-5 w-5 text-[#b90064] border-[#8e6f77] rounded-full" 
-              type="checkbox" 
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
-            <span className="text-sm text-[#5a3f47]">Remember Me</span>
-          </label>
-          <button 
-            type="button" 
-            onClick={handleOpenForgot}
-            className="text-sm font-medium text-[#b90064] hover:underline cursor-pointer"
+
+          <button
+            className="w-full h-[56px] bg-[#e6007e] text-white font-medium text-sm rounded-[16px] transition-transform active:scale-95 hover:opacity-90 cursor-pointer"
+            type="submit"
           >
-            Forgot Password?
+            Login
           </button>
-        </div>
-        <button className="w-full h-[56px] bg-[#e6007e] text-white font-medium text-sm rounded-[16px] transition-transform active:scale-95 hover:opacity-90 cursor-pointer" type="submit">
-          Login
-        </button>
-      </form>
+
+          <p className="text-center text-sm text-[#5a3f47] pt-1">
+            Don&apos;t have an account?{' '}
+            <button
+              type="button"
+              onClick={() => switchMode('signup')}
+              className="font-semibold text-[#b90064] hover:underline cursor-pointer"
+            >
+              Sign Up
+            </button>
+          </p>
+        </form>
+      )}
+
+      {/* ------------------------------- SIGN UP ------------------------------ */}
+      {mode === 'signup' && (
+        // noValidate: the browser's native bubble for type="email"/"tel" aborts
+        // submit before handleSignup runs, which hid every other field error and
+        // only surfaced one problem at a time.
+        <form className="space-y-4" onSubmit={handleSignup} noValidate>
+          <div className="flex items-start gap-2.5 p-3 bg-[#FDE7F3] rounded-xl border border-[#e2bdc7]">
+            <ShieldCheck className="text-[#b90064] shrink-0 mt-0.5" size={18} />
+            <p className="text-[11px] leading-relaxed text-[#5a3f47]">
+              Register as a <strong className="text-[#b90064]">Nexora Growth Partner</strong> to onboard shops,
+              track QR earnings and claim milestone rewards.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Full Name *</label>
+            <div className={fieldWrap(suErrors.fullName)}>
+              <User className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="e.g. Rahul Verma"
+                type="text"
+                autoComplete="name"
+                value={suName}
+                onChange={(e) => {
+                  setSuName(e.target.value);
+                  if (suErrors.fullName) setSuErrors((p) => ({ ...p, fullName: undefined }));
+                }}
+              />
+            </div>
+            {suErrors.fullName && <p className="text-xs text-[#93000a] mt-1">{suErrors.fullName}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Mobile Number *</label>
+            <div className={fieldWrap(suErrors.mobile)}>
+              <Phone className="text-[#5a3f47] mr-2" size={20} />
+              <span className="text-base text-[#5a3f47] mr-1.5 select-none">+91</span>
+              <input
+                className={inputCls}
+                placeholder="9876543210"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                autoComplete="tel-national"
+                value={suMobile}
+                onChange={(e) => {
+                  setSuMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                  if (suErrors.mobile) setSuErrors((p) => ({ ...p, mobile: undefined }));
+                }}
+              />
+            </div>
+            {suErrors.mobile && <p className="text-xs text-[#93000a] mt-1">{suErrors.mobile}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Email Address *</label>
+            <div className={fieldWrap(suErrors.email)}>
+              <Mail className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="you@example.com"
+                type="email"
+                autoComplete="email"
+                value={suEmail}
+                onChange={(e) => {
+                  setSuEmail(e.target.value);
+                  if (suErrors.email) setSuErrors((p) => ({ ...p, email: undefined }));
+                }}
+              />
+            </div>
+            {suErrors.email && <p className="text-xs text-[#93000a] mt-1">{suErrors.email}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">City *</label>
+            <div className={fieldWrap(suErrors.city)}>
+              <MapPin className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="e.g. Jaipur, Rajasthan"
+                type="text"
+                autoComplete="address-level2"
+                value={suCity}
+                onChange={(e) => {
+                  setSuCity(e.target.value);
+                  if (suErrors.city) setSuErrors((p) => ({ ...p, city: undefined }));
+                }}
+              />
+            </div>
+            {suErrors.city && <p className="text-xs text-[#93000a] mt-1">{suErrors.city}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Create Password *</label>
+            <div className={fieldWrap(suErrors.password)}>
+              <Lock className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="Create a strong password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={suPassword}
+                onChange={(e) => {
+                  setSuPassword(e.target.value);
+                  setSuStrength(scorePassword(e.target.value));
+                  if (suErrors.password) setSuErrors((p) => ({ ...p, password: undefined }));
+                }}
+              />
+              <button
+                className="ml-2 text-[#b90064] cursor-pointer"
+                type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {suErrors.password && <p className="text-xs text-[#93000a] mt-1">{suErrors.password}</p>}
+            <div className="text-xs space-y-1 mt-2">
+              <p className={suStrength.minLength ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• Min 6 characters</p>
+              <p className={suStrength.hasNumber ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one number</p>
+              <p className={suStrength.hasUpper ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one uppercase letter</p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[#5a3f47]">Confirm Password *</label>
+            <div className={fieldWrap(suErrors.confirmPassword)}>
+              <Lock className="text-[#5a3f47] mr-2" size={20} />
+              <input
+                className={inputCls}
+                placeholder="Re-enter your password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={suConfirm}
+                onChange={(e) => {
+                  setSuConfirm(e.target.value);
+                  if (suErrors.confirmPassword) setSuErrors((p) => ({ ...p, confirmPassword: undefined }));
+                }}
+              />
+              {suConfirm.length > 0 && suConfirm === suPassword && (
+                <CheckCircle2 className="ml-2 text-[#2E7D32] shrink-0" size={20} />
+              )}
+            </div>
+            {suErrors.confirmPassword && (
+              <p className="text-xs text-[#93000a] mt-1">{suErrors.confirmPassword}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-start space-x-2 cursor-pointer">
+              <input
+                className="h-4 w-4 mt-0.5 accent-[#b90064] shrink-0"
+                type="checkbox"
+                checked={suTerms}
+                onChange={(e) => {
+                  setSuTerms(e.target.checked);
+                  if (suErrors.terms) setSuErrors((p) => ({ ...p, terms: undefined }));
+                }}
+              />
+              <span className="text-xs text-[#5a3f47] leading-relaxed">
+                I agree to the <span className="text-[#b90064] font-semibold">Partner Terms</span> and{' '}
+                <span className="text-[#b90064] font-semibold">Privacy Policy</span>, and confirm the details
+                above are correct.
+              </span>
+            </label>
+            {suErrors.terms && <p className="text-xs text-[#93000a] mt-1">{suErrors.terms}</p>}
+          </div>
+
+          <button
+            className="w-full h-[56px] bg-[#e6007e] text-white font-medium text-sm rounded-[16px] transition-transform active:scale-95 hover:opacity-90 cursor-pointer disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
+            type="submit"
+            disabled={suSubmitting}
+          >
+            {suSubmitting ? (
+              <>
+                <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                <span>Creating your account…</span>
+              </>
+            ) : (
+              <>
+                <UserPlus size={18} />
+                <span>Create Partner Account</span>
+              </>
+            )}
+          </button>
+
+          <p className="text-center text-sm text-[#5a3f47] pt-1">
+            Already have an account?{' '}
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="font-semibold text-[#b90064] hover:underline cursor-pointer"
+            >
+              Login
+            </button>
+          </p>
+        </form>
+      )}
 
       {/* Forgot Password Modal */}
       {isForgotOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white rounded-[24px] p-6 w-full max-w-sm shadow-2xl border border-gray-100 relative text-left animate-in fade-in zoom-in-95 duration-200">
-            <button 
+            <button
               type="button"
               onClick={() => setIsForgotOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
@@ -179,7 +620,8 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Reset Link Sent!</h3>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  We have sent a password reset link to <strong className="text-gray-900">{resetEmail}</strong>. Please check your email inbox and spam folder.
+                  We have sent a password reset link to <strong className="text-gray-900">{resetEmail}</strong>.
+                  Please check your email inbox and spam folder.
                 </p>
                 <button
                   type="button"
@@ -202,14 +644,15 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                 </div>
 
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Enter your registered email address or 10-digit mobile number, and we will send you a link to reset your password.
+                  Enter your registered email address or 10-digit mobile number, and we will send you a link to
+                  reset your password.
                 </p>
 
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-600 ml-1">Email or Mobile Number</label>
                   <div className="flex items-center bg-[#f0edec] rounded-xl h-12 px-3.5 border border-transparent focus-within:border-[#b90064] transition-all">
                     <User className="text-gray-500 mr-2 shrink-0" size={18} />
-                    <input 
+                    <input
                       type="text"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
@@ -225,11 +668,7 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                   disabled={resetStatus === 'sending'}
                   className="w-full h-12 bg-[#b90064] text-white font-bold text-sm rounded-xl hover:bg-[#b90064]/90 transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  {resetStatus === 'sending' ? (
-                    <span>Sending Reset Link...</span>
-                  ) : (
-                    <span>Send Reset Link</span>
-                  )}
+                  {resetStatus === 'sending' ? <span>Sending Reset Link...</span> : <span>Send Reset Link</span>}
                 </button>
               </form>
             )}
@@ -239,4 +678,3 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     </div>
   );
 }
-
