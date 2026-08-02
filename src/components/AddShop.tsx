@@ -665,6 +665,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   // Lets the Continue handler scroll the mandatory consent into view and flash
   // it, instead of silently refusing to advance.
   const privacyConsentRef = useRef<HTMLLabelElement>(null);
+  // Anchor inside the form, used to locate the scrolling shell container.
+  const formTopRef = useRef<HTMLDivElement>(null);
   const [highlightPrivacyConsent, setHighlightPrivacyConsent] = useState(false);
   const [step6Confirmed, setStep6Confirmed] = useState<boolean>(false);
   const [policyConfirmed, setPolicyConfirmed] = useState<boolean>(false);
@@ -1080,6 +1082,32 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
   const canNavigateToStep = (targetStep: number): boolean => true;
 
+  /**
+   * The app shell scrolls an inner flex container, not the window, so
+   * window.scrollTo and the default scrollIntoView behaviour are both no-ops
+   * here. Walk up to the real scrolling ancestor and move that instead.
+   */
+  const getScrollContainer = (from: HTMLElement | null): HTMLElement | null => {
+    let node = from?.parentElement ?? null;
+    while (node) {
+      const { overflowY } = window.getComputedStyle(node);
+      if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  };
+
+  const scrollShellToTop = () => {
+    const container = getScrollContainer(formTopRef.current);
+    if (container) {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleStepChange = (targetStep: number) => {
     if (currentStep === 5 && targetStep > 5) {
       if (!documentPrivacyConsent) {
@@ -1090,18 +1118,30 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         );
         // The consent sits far down a long step, so Continue appeared to do
         // nothing. Bring it on screen and flash it so the blocker is obvious.
-        privacyConsentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const target = privacyConsentRef.current;
+        const container = getScrollContainer(target);
+        if (target && container) {
+          const top =
+            target.getBoundingClientRect().top -
+            container.getBoundingClientRect().top +
+            container.scrollTop -
+            container.clientHeight / 2 +
+            target.offsetHeight / 2;
+          container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        } else {
+          target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         setHighlightPrivacyConsent(true);
         window.setTimeout(() => setHighlightPrivacyConsent(false), 2600);
         return;
       }
     }
     setCurrentStep(targetStep);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollShellToTop();
   };
 
   return (
-    <div className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans w-full overflow-x-hidden relative flex flex-col">
+    <div ref={formTopRef} className="min-h-screen bg-[#FCF9F8] text-[#1b1c1b] pb-32 font-sans w-full overflow-x-hidden relative flex flex-col">
       {/* Toast Alert for Draft */}
       {draftSaved && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm animate-fade-in w-[90%] max-w-sm">
