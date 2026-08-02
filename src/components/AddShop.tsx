@@ -662,6 +662,10 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [confirmAccurate, setConfirmAccurate] = useState<boolean>(true);
   const [authorizeProfile, setAuthorizeProfile] = useState<boolean>(true);
   const [documentPrivacyConsent, setDocumentPrivacyConsent] = useState<boolean>(false);
+  // Lets the Continue handler scroll the mandatory consent into view and flash
+  // it, instead of silently refusing to advance.
+  const privacyConsentRef = useRef<HTMLLabelElement>(null);
+  const [highlightPrivacyConsent, setHighlightPrivacyConsent] = useState(false);
   const [step6Confirmed, setStep6Confirmed] = useState<boolean>(false);
   const [policyConfirmed, setPolicyConfirmed] = useState<boolean>(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState<boolean>(false);
@@ -1082,8 +1086,13 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         triggerDocToast(
           'error',
           'Document Privacy Consent Required',
-          'Please acknowledge the document privacy & security consent before proceeding to Step 6.'
+          'Please tick the document privacy & security consent below to continue to Step 6.'
         );
+        // The consent sits far down a long step, so Continue appeared to do
+        // nothing. Bring it on screen and flash it so the blocker is obvious.
+        privacyConsentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightPrivacyConsent(true);
+        window.setTimeout(() => setHighlightPrivacyConsent(false), 2600);
         return;
       }
     }
@@ -2918,43 +2927,6 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
               </div>
             </section>
 
-            {/* Toast Alert Banner for Duplicate Prevention & File Size Limit */}
-            <AnimatePresence>
-              {docToast && (
-                <motion.div
-                  initial={{ opacity: 0, y: -15, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -15, scale: 0.98 }}
-                  className={`p-4 rounded-2xl border shadow-lg flex items-start gap-3 relative overflow-hidden ${
-                    docToast.type === 'error'
-                      ? 'bg-red-50 border-red-200 text-red-900'
-                      : docToast.type === 'warning'
-                      ? 'bg-amber-50 border-amber-200 text-amber-900'
-                      : docToast.type === 'success'
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                      : 'bg-blue-50 border-blue-200 text-blue-900'
-                  }`}
-                >
-                  <div className="shrink-0 mt-0.5">
-                    {docToast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
-                    {docToast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600" />}
-                    {docToast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-                    {docToast.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
-                  </div>
-                  <div className="flex-1 pr-6">
-                    <h4 className="text-xs font-bold uppercase tracking-wider mb-0.5">{docToast.title}</h4>
-                    <p className="text-xs leading-relaxed font-medium">{docToast.message}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDocToast(null)}
-                    className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/5 text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Document Uploads Header */}
             <section className="space-y-4">
@@ -3363,7 +3335,14 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 </label>
 
                 {/* Mandatory Document Privacy & Security Consent */}
-                <label className="flex items-start gap-3 cursor-pointer group pt-2 border-t border-gray-200/60">
+                <label
+                  ref={privacyConsentRef}
+                  className={`flex items-start gap-3 cursor-pointer group pt-2 border-t transition-all rounded-xl ${
+                    highlightPrivacyConsent
+                      ? 'border-red-300 bg-red-50 ring-2 ring-red-300 p-3 -m-1'
+                      : 'border-gray-200/60'
+                  }`}
+                >
                   <div className="relative flex items-center mt-0.5">
                     <input 
                       type="checkbox"
@@ -3904,7 +3883,16 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
             <button 
               type="button"
               onClick={() => handleStepChange(currentStep + 1)}
-              className="flex-1 h-12 font-bold text-base rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl bg-primary text-white hover:bg-primary/90 active:scale-98 cursor-pointer border border-white/20"
+              title={
+                currentStep === 5 && !documentPrivacyConsent
+                  ? 'Tick the document privacy consent to continue'
+                  : undefined
+              }
+              className={`flex-1 h-12 font-bold text-base rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl active:scale-98 cursor-pointer border border-white/20 ${
+                currentStep === 5 && !documentPrivacyConsent
+                  ? 'bg-primary/60 text-white/90 hover:bg-primary/70'
+                  : 'bg-primary text-white hover:bg-primary/90'
+              }`}
             >
               Continue
               <ChevronRight size={20} />
@@ -3933,6 +3921,46 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
           )}
         </div>
       </div>
+
+      {/* Toast alerts. Rendered as a fixed overlay: it used to live inside the
+          Step 5 markup, so a message triggered from the sticky footer appeared
+          thousands of pixels down the page and the user never saw it. */}
+      <AnimatePresence>
+        {docToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -15, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -15, scale: 0.98 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[120] w-[calc(100%-2rem)] max-w-md p-4 rounded-2xl border shadow-2xl flex items-start gap-3 overflow-hidden ${
+              docToast.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-900'
+                : docToast.type === 'warning'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
+                : docToast.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}
+          >
+            <div className="shrink-0 mt-0.5">
+              {docToast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
+              {docToast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600" />}
+              {docToast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+              {docToast.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
+            </div>
+            <div className="flex-1 pr-6">
+              <h4 className="text-xs font-bold uppercase tracking-wider mb-0.5">{docToast.title}</h4>
+              <p className="text-xs leading-relaxed font-medium">{docToast.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDocToast(null)}
+              className="absolute top-3 right-3 p-1 rounded-lg hover:bg-black/5 text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cancellation Policy Modal */}
       <CancellationPolicyModal isOpen={isPolicyModalOpen} onClose={() => setIsPolicyModalOpen(false)} />
