@@ -8,6 +8,7 @@ import TicketDetailsScreen from './components/dashboard/TicketDetailsScreen';
 import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import OfflineNotificationBanner from './components/OfflineNotificationBanner';
+import { supabase, supabaseConfigError } from './lib/supabaseClient';
 
 // Heavy route-level screens are code-split so the initial bundle only carries
 // the login + dashboard path instead of every screen in the app.
@@ -88,15 +89,36 @@ function ScreenLoader() {
 export default function App() {
   const swipeRef = useRef<HTMLDivElement>(null);
 
-  // Read the auth flag during initialisation. Doing this in an effect made the
-  // login screen flash for one frame on every reload for already-signed-in users.
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    try {
-      return localStorage.getItem('isAuthenticated') === 'true';
-    } catch {
-      return false;
+  // Real Supabase session drives the auth state (replaces the fake
+  // localStorage 'isAuthenticated' flag).
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true);
+      return;
     }
-  });
+    let cancelled = false;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!cancelled) {
+          setIsLoggedIn(Boolean(data.session));
+          setAuthReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(Boolean(session));
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [history, setHistory] = useState<string[]>(['dashboard']);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -104,19 +126,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Initialize persistent storage layer in localStorage
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('nexora_partner_profile')) {
-        localStorage.setItem('nexora_partner_profile', JSON.stringify(DEFAULT_PARTNER_PROFILE));
-      }
-      if (!localStorage.getItem('nexora_dashboard_cache')) {
-        localStorage.setItem('nexora_dashboard_cache', JSON.stringify(DEFAULT_DASHBOARD_CACHE));
-      }
-    } catch (err) {
-      console.warn('Unable to access localStorage for persistent user cache:', err);
-    }
-  }, []);
+  // No more fake seeded demo profile / dashboard cache — the dashboard reads
+  // the signed-in partner's live data from Supabase.
 
   useEffect(() => {
     let syncTimer: ReturnType<typeof setTimeout> | undefined;
@@ -209,12 +220,31 @@ export default function App() {
   });
 
 
+  if (supabaseConfigError) {
+    return (
+      <div className="min-h-screen bg-[#fcf9f8] flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="mb-2 text-lg font-bold text-[#1b1c1b]">Configuration required</h1>
+          <p className="text-sm leading-6 text-gray-600">{supabaseConfigError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#fcf9f8] flex flex-col items-center justify-center p-6 gap-3">
+        <div className="w-9 h-9 rounded-full border-2 border-pink-200 border-t-primary animate-spin" />
+        <p className="text-xs font-semibold text-gray-400">Loading Nexora Growth Partner…</p>
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#fcf9f8] flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <LoginForm onLoginSuccess={() => {
-            localStorage.setItem('isAuthenticated', 'true');
             setIsLoggedIn(true);
           }} />
         </div>
@@ -307,8 +337,8 @@ export default function App() {
         onBack={goBack} 
         onNavigate={navigateTo} 
         onLogout={() => {
-          localStorage.removeItem('isAuthenticated');
           setIsLoggedIn(false);
+          void supabase?.auth.signOut();
         }} 
       />;
     }
@@ -360,8 +390,8 @@ export default function App() {
       isSyncing={isSyncing}
       onNavigate={navigateTo}
       onLogout={() => {
-        localStorage.removeItem('isAuthenticated');
         setIsLoggedIn(false);
+        void supabase?.auth.signOut();
       }} />;
   };
 
