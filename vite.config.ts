@@ -28,6 +28,8 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 700,
     },
     server: {
+      // Allow preview/proxy hosts (e.g. sandbox preview domains).
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

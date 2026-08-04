@@ -15,6 +15,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { createNumericRef } from '../utils/id';
+import { supabase, supabaseConfigError } from '../lib/supabaseClient';
+import { isGrowthPartnerRole } from '../lib/gpRepository';
 
 type AuthMode = 'login' | 'signup';
 
@@ -112,23 +114,77 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     setSuErrors({});
   };
 
-  // ---------------- Login submit ----------------
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const usernameError = validateUsername(username);
-    const passwordError = checkPasswordStrength(password);
+  const [authBusy, setAuthBusy] = useState(false);
 
-    if (usernameError || passwordError) {
-      setErrors({ username: usernameError, password: passwordError });
+  // ---------------- Login submit ----------------
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authBusy) return;
+
+    const usernameError = validateUsername(username);
+    if (usernameError || !password) {
+      setErrors({
+        username: usernameError,
+        password: !password ? 'Please enter your password.' : '',
+      });
       return;
     }
 
-    if (rememberMe) {
-      localStorage.setItem('rememberedUsername', username);
-    } else {
-      localStorage.removeItem('rememberedUsername');
+    if (!supabase) {
+      setErrors({ username: supabaseConfigError || 'Supabase is not configured.', password: '' });
+      return;
     }
-    onLoginSuccess();
+
+    if (!isValidEmail(username)) {
+      setErrors({
+        username: 'Please sign in with the email address you registered with.',
+        password: '',
+      });
+      return;
+    }
+
+    setAuthBusy(true);
+    setMessage(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: username.trim().toLowerCase(),
+        password,
+      });
+      if (error) {
+        setErrors({ username: '', password: 'Invalid email or password. Please try again.' });
+        return;
+      }
+      const userId = data.user?.id;
+      if (!userId) {
+        setErrors({ username: '', password: 'Sign-in failed. Please try again.' });
+        return;
+      }
+
+      // Permanent-role guard: only Growth Partners may enter this app.
+      const roleCheck = await isGrowthPartnerRole(supabase, userId);
+      if (!roleCheck.allowed) {
+        await supabase.auth.signOut();
+        setErrors({
+          username: '',
+          password: roleCheck.foundRole
+            ? `This account is registered as "${roleCheck.foundRole}" and cannot access the Growth Partner app.`
+            : 'This account does not have a Growth Partner role assigned yet.',
+        });
+        return;
+      }
+
+      if (rememberMe) {
+        localStorage.setItem('rememberedUsername', username);
+      } else {
+        localStorage.removeItem('rememberedUsername');
+      }
+      onLoginSuccess();
+    } catch (err) {
+      console.warn('Sign-in failed:', err);
+      setErrors({ username: '', password: 'Sign-in failed. Check your connection and try again.' });
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   // ---------------- Sign up submit ----------------
@@ -160,72 +216,71 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     return next;
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const found = validateSignup();
     setSuErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    // Reject a duplicate registration on this device.
-    let existing: Array<{ mobile?: string; email?: string }> = [];
-    try {
-      const raw = localStorage.getItem(REGISTERED_PARTNERS_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) existing = parsed;
-    } catch {
-      existing = [];
-    }
-
     const mobile = suMobile.trim();
     const email = suEmail.trim().toLowerCase();
-    const clash = existing.find(
-      (p) => p.mobile === mobile || (p.email || '').toLowerCase() === email
-    );
-    if (clash) {
-      setSuErrors({
-        mobile: clash.mobile === mobile ? 'This mobile number is already registered.' : undefined,
-        email: (clash.email || '').toLowerCase() === email ? 'This email is already registered.' : undefined,
-      });
-      return;
-    }
 
     setSuSubmitting(true);
 
     const name = suName.trim().replace(/\s+/g, ' ');
     const city = suCity.trim();
-    const profile = {
-      name,
-      mobile,
-      email,
-      city,
-      agentCode: buildAgentCode(city),
-      upiId: '',
-      joinedDate: new Date().toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }),
-      status: 'Active Partner',
-    };
 
     try {
-      // Overwrite the seeded demo profile so the dashboard greets the new
-      // partner rather than the placeholder account.
-      localStorage.setItem(PARTNER_PROFILE_KEY, JSON.stringify(profile));
-      localStorage.setItem(
-        REGISTERED_PARTNERS_KEY,
-        JSON.stringify([...existing, { mobile, email, name }])
-      );
-      localStorage.setItem('rememberedUsername', mobile);
-    } catch (err) {
-      console.warn('Unable to persist the new partner profile:', err);
-    }
+      if (!supabase) {
+        setSuErrors({ email: supabaseConfigError || 'Supabase is not configured.' });
+        setSuSubmitting(false);
+        return;
+      }
+      // Real account in the shared Nexora project. The Growth Partner role is
+      // assigned by Nexora ops (permanent roles are locked server-side).
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: suPassword,
+        options: {
+          data: {
+            full_name: name,
+            mobile,
+            city,
+            partner_code: buildAgentCode(city),
+            signup_role: 'growth_partner',
+          },
+        },
+      });
+      if (error) {
+        setSuErrors({
+          email: error.message.includes('already registered')
+            ? 'This email is already registered. Please sign in instead.'
+            : `Sign-up failed: ${error.message}`,
+        });
+        setSuSubmitting(false);
+        return;
+      }
 
-    // Brief pause so the button's pending state is visible.
-    setTimeout(() => {
+      localStorage.setItem('rememberedUsername', email);
+
+      if (!data.session) {
+        // Email confirmation required before first sign-in.
+        setMessage({
+          type: 'success',
+          text: 'Account created! Check your email to confirm your address, then sign in.',
+        });
+        setSuSubmitting(false);
+        switchMode('login');
+        return;
+      }
+
       setSuSubmitting(false);
       onLoginSuccess();
-    }, 900);
+    } catch (err) {
+      console.warn('Sign-up failed:', err);
+      setSuErrors({ email: 'Sign-up failed. Check your connection and try again.' });
+      setSuSubmitting(false);
+    }
   };
 
   const handleOpenForgot = () => {

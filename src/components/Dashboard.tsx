@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getItem } from '../utils/db';
+import { supabase } from '../lib/supabaseClient';
+import {
+  resolveGrowthPartner,
+  fetchMyAttributions,
+  fetchCommissionSummary,
+} from '../lib/gpRepository';
 
 import DashboardHeader from './dashboard/DashboardHeader';
 import EarningsCard from './dashboard/EarningsCard';
@@ -16,52 +22,54 @@ import { Plus } from 'lucide-react';
 import GrowthTip from './dashboard/GrowthTip';
 
 export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyncing = false }: { onLogout: () => void, onNavigate: (page: string) => void, isOnline?: boolean, isSyncing?: boolean }) {
-  const [currentShops, setCurrentShops] = useState(250);
-  const totalShops = 250;
-  const [availableAmount, setAvailableAmount] = useState(8400);
-  const [partnerName, setPartnerName] = useState('Rahul Verma');
+  // Live figures from the shared Supabase project (replaces the hardcoded
+  // demo values + localStorage/IndexedDB cache).
+  const [currentShops, setCurrentShops] = useState(0);
+  const [totalShops, setTotalShops] = useState(0);
+  const [availableAmount, setAvailableAmount] = useState(0);
+  const [partnerName, setPartnerName] = useState('Growth Partner');
 
   useEffect(() => {
+    let cancelled = false;
     const loadData = async () => {
+      if (!supabase) return;
       try {
-        const savedProfile = localStorage.getItem('nexora_partner_profile');
-        if (savedProfile) {
-          const parsed = JSON.parse(savedProfile);
-          if (parsed.name) {
-            setPartnerName(parsed.name);
-          }
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+        if (!user || cancelled) return;
+
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (cancelled) return;
+        if (partner) {
+          const name = (partner.full_name ?? partner.name ?? user.user_metadata?.full_name) as
+            | string
+            | undefined;
+          if (name) setPartnerName(String(name));
+
+          const [attributions, summary] = await Promise.all([
+            fetchMyAttributions(supabase, String(partner.id)),
+            fetchCommissionSummary(supabase, String(partner.id)),
+          ]);
+          if (cancelled) return;
+          const active = attributions.filter((a) => a.status === 'active');
+          setCurrentShops(active.length);
+          setTotalShops(attributions.length);
+          // "Available" = commissions released from the 7-day hold (payable).
+          setAvailableAmount(Math.round(summary.payablePaise / 100));
+          return;
         }
 
-        // 1. Try reading from nexora_dashboard_cache in localStorage first
-        const savedDashboardCache = localStorage.getItem('nexora_dashboard_cache');
-        if (savedDashboardCache) {
-          const parsedCache = JSON.parse(savedDashboardCache);
-          if (parsedCache.availableAmount !== undefined) {
-            setAvailableAmount(parsedCache.availableAmount);
-          }
-          if (parsedCache.qualifyingShopsCount !== undefined) {
-            setCurrentShops(parsedCache.qualifyingShopsCount);
-          }
-        }
-
-        // 2. Read IndexedDB items if present
-        const cachedEarnings = await getItem<any>('earnings_data');
-        if (cachedEarnings && cachedEarnings.availableAmount !== undefined) {
-          setAvailableAmount(cachedEarnings.availableAmount);
-        }
-        
-        const cachedShopsData = await getItem<any[]>('myshops_data');
-        if (cachedShopsData) {
-          const qualifying = cachedShopsData.filter(s => s.status === 'Qualifying').length;
-          if (qualifying > 0) {
-            setCurrentShops(qualifying);
-          }
-        }
+        // No growth_partners row yet — fall back to the auth profile name.
+        const metaName = user.user_metadata?.full_name;
+        if (metaName) setPartnerName(String(metaName));
       } catch (err) {
-        console.error('Failed to load cached dashboard data:', err);
+        console.warn('Failed to load live dashboard data:', err);
       }
     };
-    loadData();
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   
   return (
