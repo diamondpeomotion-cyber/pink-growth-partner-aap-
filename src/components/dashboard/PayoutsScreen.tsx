@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyPayouts } from '../../lib/gpRepository';
 import {
   ArrowLeft,
   HelpCircle,
@@ -24,13 +26,7 @@ interface PayoutStatusItem {
   description?: string;
 }
 
-const INITIAL_HISTORY: PayoutStatusItem[] = [
-  { id: 'h-1', type: 'Payout Scheduled', date: '03 Aug 2026', amount: 8400, status: 'Upcoming', description: 'Weekly Tuesday Auto-Reprocessing' },
-  { id: 'h-2', type: 'Instant settlement', date: '26 Jul 2026', amount: 7850, status: 'Completed', description: 'Settled to HDFC Bank' },
-  { id: 'h-3', type: 'Instant settlement', date: '19 Jul 2026', amount: 6400, status: 'Completed', description: 'Settled to HDFC Bank' },
-  { id: 'h-4', type: 'Bank Settlement Fail', date: '12 Jul 2026', amount: 7200, status: 'Failed', description: 'IFSC matching failure' },
-  { id: 'h-5', type: 'Rolling adjustment', date: '05 Jul 2026', amount: 300, status: 'Carried Forward', description: 'Pending client signature' }
-];
+
 
 export default function PayoutsScreen({
   onNavigate,
@@ -44,16 +40,42 @@ export default function PayoutsScreen({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Bank state simulation
-  const [bankName, setBankName] = useState('HDFC Bank');
-  const [accountHolder, setAccountHolder] = useState('Rajesh Kumar');
-  const [accountNumber, setAccountNumber] = useState('•••• 4582');
-  const [isVerified, setIsVerified] = useState(true);
+  const [bankName, setBankName] = useState('—');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
 
   // Help modal
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   // New simulated history
-  const [historyItems, setHistoryItems] = useState<PayoutStatusItem[]>(INITIAL_HISTORY);
+  const [historyItems, setHistoryItems] = useState<PayoutStatusItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) { setHistoryItems([]); return; }
+        const rows = await fetchMyPayouts(supabase, String(partner.id));
+        if (cancelled) return;
+        setHistoryItems(rows.map((p) => ({
+          id: p.id,
+          type: 'Payout',
+          date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          amount: Math.round(p.amountPaise / 100),
+          status: (p.status === 'paid' ? 'Completed' : p.status === 'failed' ? 'Failed' : 'Upcoming') as PayoutStatusItem['status'],
+        })));
+      } catch (err) {
+        console.warn('Payouts load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
