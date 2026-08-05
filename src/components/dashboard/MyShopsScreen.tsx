@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { getItem, setItem } from '../../utils/db';
 
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -32,6 +31,8 @@ import {
   SearchX
 } from 'lucide-react';
 import BottomNav from './BottomNav';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions } from '../../lib/gpRepository';
 
 interface Shop {
   id: string;
@@ -56,130 +57,7 @@ interface Shop {
   earnings?: number;
 }
 
-const INITIAL_SHOPS: Shop[] = [
-  {
-    id: '1',
-    name: 'Glow Beauty Parlour',
-    code: 'NX-SHOP-0247',
-    status: '15-Day Cycle',
-    displayStatus: 'Passed',
-    type: '15-Day Cycle',
-    progress: {
-      current: 9,
-      total: 15,
-      label: 'Day 9 of 15',
-      statusLabel: 'On Track',
-      percentage: 60
-    },
-    area: 'MI Road',
-    ownerName: 'Sunita Sharma',
-    mobile: '98765 12345',
-    earnings: 4500
-  },
-  {
-    id: '2',
-    name: 'Royal Cut Salon',
-    code: 'NX-SHOP-0248',
-    status: 'Daily Target Failed',
-    displayStatus: 'Failed',
-    type: 'Daily Target Failed',
-    issueDescription: 'Transaction: ₹800 - Today’s minimum ₹1,000 QR target was not completed.',
-    issueType: 'low_transaction',
-    area: 'Mansarovar',
-    ownerName: 'Rajesh Sharma',
-    mobile: '98290 87654',
-    earnings: 12000
-  },
-  {
-    id: '3',
-    name: 'Urban Spa',
-    code: 'NX-SHOP-0225',
-    status: 'Qualifying',
-    displayStatus: 'Qualifying',
-    type: 'Qualifying',
-    issueDescription: '15-Day Cycle: Completed successfully.',
-    area: 'C-Scheme',
-    ownerName: 'Amit Verma',
-    mobile: '98112 34567',
-    earnings: 15000
-  },
-  {
-    id: '4',
-    name: 'Style Studio',
-    code: 'NX-SHOP-0265',
-    status: 'QR Not Active',
-    displayStatus: 'Inactive',
-    type: 'QR Not Active',
-    issueDescription: 'QR qualification will start after Nexora QR activation by the merchant.',
-    area: 'Malviya Nagar',
-    ownerName: 'Pooja Gupta',
-    mobile: '98555 12121',
-    earnings: 0
-  },
-  {
-    id: '5',
-    name: 'The Nail Room',
-    code: 'NX-SHOP-0269',
-    status: 'Need Changes',
-    displayStatus: 'Needs Fix',
-    type: 'Need Changes',
-    issueDescription: 'Shop front photo is unclear. Please re-upload a clear image.',
-    issueType: 'unclear_photo',
-    area: 'Vaishali Nagar',
-    ownerName: 'Kiran Kapoor',
-    mobile: '98111 22233',
-    earnings: 0
-  },
-  {
-    id: '6',
-    name: 'Jaipur Tattoo Studio',
-    code: 'NX-SHOP-0271',
-    status: 'Under Review',
-    displayStatus: 'Reviewing',
-    type: 'Under Review',
-    submittedDate: '26 Jul 2026',
-    area: 'Raja Park',
-    ownerName: 'Kunal Singh',
-    mobile: '99887 76655',
-    earnings: 0
-  },
-  {
-    id: '7',
-    name: 'Shear Genius Salon',
-    code: 'NX-SHOP-0272',
-    status: 'KYC Pending',
-    displayStatus: 'KYC Pending',
-    type: 'KYC Pending',
-    area: 'MI Road',
-    ownerName: 'Anil Kumar',
-    mobile: '97865 43210',
-    earnings: 0
-  },
-  {
-    id: '8',
-    name: 'Pink City Spa',
-    code: 'NX-SHOP-0273',
-    status: 'Draft',
-    displayStatus: 'Draft',
-    type: 'Draft',
-    area: 'Mansarovar',
-    ownerName: 'Sanjay Dutta',
-    mobile: '94140 12345',
-    earnings: 0
-  },
-  {
-    id: '9',
-    name: 'Elite Gents Salon',
-    code: 'NX-SHOP-0274',
-    status: 'Rejected',
-    displayStatus: 'Rejected',
-    type: 'Rejected',
-    area: 'Sodala',
-    ownerName: 'Harish Meena',
-    mobile: '94140 54321',
-    earnings: 0
-  }
-];
+
 
 export default function MyShopsScreen({
   onNavigate,
@@ -188,7 +66,8 @@ export default function MyShopsScreen({
   onNavigate: (page: string) => void;
   onBack?: () => void;
 }) {
-  const [shops, setShops] = useState<Shop[]>(INITIAL_SHOPS);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [shopsLoading, setShopsLoading] = useState(true);
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
   
   const tabsScrollRef = useRef<HTMLDivElement>(null);
@@ -232,30 +111,41 @@ export default function MyShopsScreen({
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Live data: shops attributed to this partner from the shared project.
     const loadData = async () => {
       try {
-        const cachedShops = await getItem<Shop[]>('myshops_data');
-        if (cachedShops && cachedShops.length > 0) {
-          setShops(cachedShops);
-        } else {
-          await setItem('myshops_data', INITIAL_SHOPS);
-        }
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner) { setShops([]); return; }
+        const rows = await fetchMyAttributions(supabase, String(partner.id));
+        setShops(rows.map((a) => ({
+          id: String(a.id),
+          name: a.salon_name ?? 'Shop',
+          code: a.salon_name ?? '',
+          status: (a.status === 'active' ? 'Passed' : 'Under Review') as Shop['status'],
+          displayStatus: String(a.status),
+          type: 'Salon',
+          area: a.salon_area ?? '',
+          ownerName: '',
+          mobile: '',
+          earnings: 0,
+        })));
       } catch (err) {
-        console.error('Failed to load from IndexedDB', err);
+        console.warn('My shops load failed:', err);
+        setShops([]);
+      } finally {
+        setShopsLoading(false);
       }
     };
-    loadData();
+    void loadData();
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  // Save when shops change (e.g. if we add a shop later)
-  useEffect(() => {
-    setItem('myshops_data', shops).catch(console.error);
-  }, [shops]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -1390,7 +1280,7 @@ export default function MyShopsScreen({
                   {[
                     { title: 'Daily Limit Reached', desc: '3 new qualifying shops verified today in Jaipur territory!', time: '10 mins ago', urgent: false },
                     { title: 'Action Required', desc: 'Royal Cut Salon requires transaction backup before midnight.', time: '1 hour ago', urgent: true },
-                    { title: 'Onboarding Succeeded', desc: 'Glow Beauty Parlour has finished Day 9 target.', time: '3 hours ago', urgent: false }
+                    { title: 'Attribution synced', desc: 'Shop status updated from the live ledger.', time: 'Just now', urgent: false }
                   ].map((notif, idx) => (
                     <div key={idx} className={`p-3 rounded-2xl border text-xs relative ${
                       notif.urgent 
