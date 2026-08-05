@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions } from '../../lib/gpRepository';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -193,18 +195,29 @@ export default function RewardDetailsScreen({
   onNavigate: (page: string) => void;
   onBack: () => void;
 }) {
-  const [qualifyingCount] = useState<number>(() => {
-    // Read the simulated count during initialisation so the milestone maths is
-    // correct on the first render (the effect version rendered 247 first and
-    // then corrected itself, briefly showing the wrong reward status).
-    try {
-      const savedCount = localStorage.getItem('simulatedQualifyingCount');
-      const parsed = savedCount ? parseInt(savedCount, 10) : NaN;
-      return Number.isFinite(parsed) ? parsed : 247;
-    } catch {
-      return 247;
-    }
-  });
+  const [qualifyingCount, setQualifyingCount] = useState<number>(0);
+
+  // Live qualifying count: active shops attributed to this partner.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) return;
+        const rows = await fetchMyAttributions(supabase, String(partner.id));
+        if (cancelled) return;
+        setQualifyingCount(rows.filter((a) => a.status === 'active').length);
+      } catch (err) {
+        console.warn('Reward progress load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
   const [selectedRewardId, setSelectedRewardId] = useState<number>(250);
   const [showClaimSuccess, setShowClaimSuccess] = useState<boolean>(false);
   // Generated once when the claim is submitted. Previously this was computed
