@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyPayouts } from '../../lib/gpRepository';
 import {
   ArrowLeft,
   Calendar,
@@ -26,49 +28,7 @@ interface PayoutItem {
   failureReason?: string;
 }
 
-const INITIAL_PAYOUTS: PayoutItem[] = [
-  {
-    id: 'pay-001',
-    payoutId: 'PAY-8912-NX',
-    date: '26 Jul 2026',
-    amount: 7850,
-    bankName: 'State Bank of India',
-    bankAccount: '...8940',
-    status: 'Completed',
-    utr: 'SBI92384712039'
-  },
-  {
-    id: 'pay-002',
-    payoutId: 'PAY-8722-NX',
-    date: '19 Jul 2026',
-    amount: 6400,
-    bankName: 'State Bank of India',
-    bankAccount: '...8940',
-    status: 'Processing',
-    utr: 'SBIPENDING92301'
-  },
-  {
-    id: 'pay-003',
-    payoutId: 'PAY-8540-NX',
-    date: '12 Jul 2026',
-    amount: 7200,
-    bankName: 'State Bank of India',
-    bankAccount: '...8940',
-    status: 'Failed',
-    utr: 'N/A',
-    failureReason: 'Incorrect IFSC code or invalid bank account structure'
-  },
-  {
-    id: 'pay-004',
-    payoutId: 'PAY-8102-NX',
-    date: '05 Jul 2026',
-    amount: 6900,
-    bankName: 'State Bank of India',
-    bankAccount: '...8940',
-    status: 'Completed',
-    utr: 'SBI91049581290'
-  }
-];
+
 
 export default function PayoutHistoryScreen({
   onNavigate,
@@ -77,8 +37,37 @@ export default function PayoutHistoryScreen({
   onNavigate: (page: string) => void;
   onBack?: () => void;
 }) {
-  const [payouts, setPayouts] = useState<PayoutItem[]>(INITIAL_PAYOUTS);
+  const [payouts, setPayouts] = useState<PayoutItem[]>([]);
   const [selectedPayout, setSelectedPayout] = useState<PayoutItem | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) { setPayouts([]); return; }
+        const rows = await fetchMyPayouts(supabase, String(partner.id));
+        if (cancelled) return;
+        setPayouts(rows.map((p) => ({
+          id: p.id,
+          payoutId: p.id.slice(0, 8).toUpperCase(),
+          date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          amount: Math.round(p.amountPaise / 100),
+          bankName: 'Nexora',
+          bankAccount: 'Nexora payout',
+          status: (p.status === 'paid' ? 'Completed' : p.status === 'failed' ? 'Failed' : 'Processing') as PayoutItem['status'],
+          utr: p.id.slice(0, 12),
+        })));
+      } catch (err) {
+        console.warn('Payout history load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
   
   // Interactive simulator for resolving the failed payout
   const [showResolveModal, setShowResolveModal] = useState(false);
