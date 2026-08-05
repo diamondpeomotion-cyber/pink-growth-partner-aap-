@@ -226,3 +226,209 @@ export async function fetchMyProposals(
   }
   return (data ?? []) as GpProposal[];
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4 additions — live ledger entries, payouts, notifications, profile,
+// shop-application submission (contract verified against the live project;
+// server-side RLS may reject the insert — surfaced to the UI, never faked).
+// ---------------------------------------------------------------------------
+
+export interface CommissionEntry {
+  id: string;
+  salonId: string | null;
+  bookingId: string | null;
+  commissionPaise: number;
+  status: string;
+  holdUntil: string | null;
+  createdAt: string | null;
+}
+
+export async function fetchCommissionEntries(
+  client: SupabaseClient,
+  partnerId: string,
+): Promise<CommissionEntry[]> {
+  const { data, error } = await client
+    .from('growth_partner_commissions')
+    .select('id, salon_id, booking_id, commission_paise, status, hold_until, created_at')
+    .eq('growth_partner_id', partnerId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
+  return ((data ?? []) as any[]).map((r) => ({
+    id: String(r.id),
+    salonId: r.salon_id ? String(r.salon_id) : null,
+    bookingId: r.booking_id ? String(r.booking_id) : null,
+    commissionPaise: Number(r.commission_paise ?? 0),
+    status: String(r.status ?? 'unknown'),
+    holdUntil: r.hold_until ? String(r.hold_until) : null,
+    createdAt: r.created_at ? String(r.created_at) : null,
+  }));
+}
+
+export interface PartnerPayout {
+  id: string;
+  status: string;
+  amountPaise: number;
+  createdAt: string | null;
+  paidAt: string | null;
+}
+
+export async function fetchMyPayouts(
+  client: SupabaseClient,
+  partnerId: string,
+): Promise<PartnerPayout[]> {
+  // select=* is intentionally defensive: the live partner_payouts columns are
+  // not documented in any migration; amount fields differ per environment.
+  const { data, error } = await client
+    .from('partner_payouts')
+    .select('*')
+    .eq('growth_partner_id', partnerId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
+  return ((data ?? []) as any[]).map((r) => ({
+    id: String(r.id),
+    status: String(r.status ?? 'unknown'),
+    amountPaise: Number(r.amount_paise ?? r.total_paise ?? r.amount ?? 0),
+    createdAt: r.created_at ? String(r.created_at) : null,
+    paidAt: r.paid_at ?? r.settled_at ?? null,
+  }));
+}
+
+export interface PartnerNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string | null;
+}
+
+export async function fetchPartnerNotifications(
+  client: SupabaseClient,
+  userId: string,
+): Promise<PartnerNotification[]> {
+  const { data, error } = await client
+    .from('notifications')
+    .select('id, notification_type, title, message, read_at, created_at')
+    .eq('recipient_user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
+  return ((data ?? []) as any[]).map((r) => ({
+    id: String(r.id),
+    type: String(r.notification_type ?? 'general'),
+    title: String(r.title ?? 'Nexora'),
+    message: String(r.message ?? ''),
+    read: Boolean(r.read_at),
+    createdAt: r.created_at ? String(r.created_at) : null,
+  }));
+}
+
+/** Update the partner's own profile row (RLS: profiles_update_own). */
+export async function updatePartnerProfile(
+  client: SupabaseClient,
+  patch: { full_name?: string; phone?: string | null; avatar_path?: string | null },
+): Promise<void> {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) throw new Error('Not authenticated.');
+  const { error } = await client.from('profiles').update(patch).eq('id', user.id);
+  if (error) throw error;
+}
+
+export interface ShopApplicationInput {
+  ownerEmail: string;
+  ownerPhone: string;
+  shopName: string;
+  city: string;
+  locality: string;
+  fullAddress: string;
+  openingTime: string;
+  closingTime: string;
+  aboutShop: string;
+  websiteTemplate: string;
+}
+
+/**
+ * Submit a new shop application + website-setup proposal. Contract mirrors the
+ * proven dashboard flow (save_growth_partner_salon_setup RPC). The live
+ * server currently REJECTS the application insert via RLS (42501) — the error
+ * is surfaced to the UI so nothing is silently faked.
+ */
+export async function submitShopApplication(
+  client: SupabaseClient,
+  input: ShopApplicationInput,
+): Promise<{ applicationId: string }> {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) throw new Error('Not authenticated.');
+
+  // 1. Resolve (or create) the partner identity row.
+  let partner = await resolveGrowthPartner(client, user.id);
+  if (!partner) {
+    const suffix = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const { data: newPartner, error: partnerErr } = await client
+      .from('growth_partners')
+      .insert({
+        user_id: user.id,
+        partner_code: `NXR${suffix}`,
+        referral_code: `REF${suffix}`,
+        status: 'applied',
+      })
+      .select('id')
+      .single();
+    if (partnerErr) throw partnerErr;
+    partner = { id: newPartner.id, user_id: user.id };
+  }
+
+  // 2. Create the onboarding application (server RLS decides).
+  const { data: app, error: appErr } = await client
+    .from('shop_onboarding_applications')
+    .insert({
+      submitted_by_partner_id: partner.id,
+      status: 'draft',
+      current_step: 6,
+      owner_email: input.ownerEmail.trim().toLowerCase(),
+      owner_phone: input.ownerPhone.trim(),
+      shop_name: input.shopName.trim(),
+      city: input.city.trim(),
+      locality: input.locality.trim(),
+      full_address: input.fullAddress.trim(),
+      opening_time: input.openingTime,
+      closing_time: input.closingTime,
+      about_shop: input.aboutShop.trim(),
+      website_template: input.websiteTemplate,
+    })
+    .select('id')
+    .single();
+  if (appErr) throw appErr;
+
+  // 3. Save the website-setup proposal payload.
+  const payload = {
+    profile: {
+      name: input.shopName.trim(),
+      description: input.aboutShop.trim(),
+      phone: input.ownerPhone.trim(),
+      email: input.ownerEmail.trim().toLowerCase(),
+      address: input.fullAddress.trim(),
+      area: input.locality.trim(),
+      city: input.city.trim(),
+      opening_hours: { opens: input.openingTime, closes: input.closingTime },
+    },
+    services: [],
+    template: { key: input.websiteTemplate },
+  };
+  const { error: proposalErr } = await client.rpc('save_growth_partner_salon_setup', {
+    p_application_id: app.id,
+    p_payload: payload,
+    p_submit: true,
+  });
+  if (proposalErr) throw proposalErr;
+
+  return { applicationId: String(app.id) };
+}
