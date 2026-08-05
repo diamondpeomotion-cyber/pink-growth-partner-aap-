@@ -56,7 +56,7 @@ export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
             <p className="text-sm text-gray-500 mb-6 font-mono bg-gray-50 px-3 py-1 rounded-lg">{scannedCode}</p>
 
             <div className="bg-pink-50 rounded-2xl p-4 w-full text-left mb-6">
-              <h3 className="font-semibold text-primary text-sm mb-1">Glow Beauty Parlour</h3>
+              <h3 className="font-semibold text-primary text-sm mb-1">Nexora Salon</h3>
               <p className="text-xs text-gray-600">Mansarovar, Jaipur • Status: Active Partner</p>
             </div>
 
