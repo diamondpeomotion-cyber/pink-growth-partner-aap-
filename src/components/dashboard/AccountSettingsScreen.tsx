@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { updatePartnerProfile } from '../../lib/gpRepository';
 import { 
   ArrowLeft, 
   User, 
@@ -17,28 +19,40 @@ import {
 } from 'lucide-react';
 
 export default function AccountSettingsScreen({ onBack }: { onBack: () => void }) {
-  const [profile, setProfile] = useState(() => {
-    const saved = localStorage.getItem('nexora_partner_profile');
-    if (saved) {
+  const [profile, setProfile] = useState({ name: '', email: '', mobile: '', alternateMobile: '' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
       try {
-        return JSON.parse(saved);
-      } catch {
-        // Fallback
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const { data: row } = await supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', user.id)
+          .maybeSingle();
+        setProfile({
+          name: row?.full_name || user.user_metadata?.full_name || '',
+          email: user.email || '',
+          mobile: row?.phone || user.phone || '',
+          alternateMobile: '',
+        });
+      } catch (err) {
+        console.warn('Account settings load failed:', err);
       }
-    }
-    return {
-      name: 'Rajesh Kumar',
-      email: 'r.kumar@example.com',
-      mobile: '+91 98321 45678',
-      alternateMobile: '',
     };
-  });
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('Nexora@2026');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -53,9 +67,16 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
     bookings: true
   });
 
-  const handleSaveProfile = () => {
-    localStorage.setItem('nexora_partner_profile', JSON.stringify(profile));
-    setSavedSuccess(true);
+  const handleSaveProfile = async () => {
+    try {
+      await updatePartnerProfile(supabase!, {
+        full_name: profile.name,
+        phone: profile.mobile || null,
+      });
+      setSavedSuccess(true);
+    } catch (err: any) {
+      alert(err?.message || 'Could not save profile.');
+    }
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
@@ -78,21 +99,27 @@ export default function AccountSettingsScreen({ onBack }: { onBack: () => void }
     }
   };
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     if (!newPassword) return;
-    if (newPassword.length < 6) {
-      setPasswordMsg({ text: 'New password must be at least 6 characters long.', type: 'error' });
+    if (newPassword.length < 8) {
+      setPasswordMsg({ text: 'New password must be at least 8 characters long.', type: 'error' });
       return;
     }
     if (newPassword !== confirmPassword) {
       setPasswordMsg({ text: 'New Password and Confirm New Password do not match!', type: 'error' });
       return;
     }
-    setCurrentPassword(newPassword);
-    setNewPassword('');
-    setConfirmPassword('');
-    setPasswordMsg({ text: 'Password updated successfully!', type: 'success' });
-    setTimeout(() => setPasswordMsg(null), 4000);
+    try {
+      const { error } = await supabase!.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordMsg({ text: 'Password updated successfully!', type: 'success' });
+      setTimeout(() => setPasswordMsg(null), 4000);
+    } catch (err: any) {
+      setPasswordMsg({ text: err?.message || 'Could not update password.', type: 'error' });
+    }
   };
 
   const toggleNotif = (key: keyof typeof notifPreferences) => {
