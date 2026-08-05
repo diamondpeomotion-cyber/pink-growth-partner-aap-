@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getItem, setItem } from '../../utils/db';
 
 import {
   ArrowLeft,
@@ -18,6 +17,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import BottomNav from './BottomNav';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions, fetchCommissionEntries, fetchMyPayouts } from '../../lib/gpRepository';
 
 interface ShopEarning {
   id: string;
@@ -38,18 +39,7 @@ interface HistoricPayout {
   utr: string;
 }
 
-const SH_EARNINGS_DATA: ShopEarning[] = [
-  { id: '1', name: 'Glow Beauty Parlour', code: 'NX-SHOP-0247', earnings: 4500, transactions: 47, status: 'In Cycle' },
-  { id: '2', name: 'Urban Spa', code: 'NX-SHOP-0225', earnings: 15000, transactions: 112, status: 'Qualifying' },
-  { id: '3', name: 'Royal Cut Salon', code: 'NX-SHOP-0248', earnings: 12000, transactions: 89, status: 'Action Needed' },
-  { id: '4', name: 'Pink City Spa', code: 'NX-SHOP-0273', earnings: 0, transactions: 0, status: 'In Cycle' },
-];
 
-const HISTORIC_PAYOUTS: HistoricPayout[] = [
-  { id: 'p1', payoutId: 'PAY-8912-NX', date: '21 Jul 2026', amount: 8400, bank: 'State Bank of India (***2345)', status: 'Processed', utr: 'SBI92384712039' },
-  { id: 'p2', payoutId: 'PAY-8722-NX', date: '14 Jul 2026', amount: 12500, bank: 'State Bank of India (***2345)', status: 'Processed', utr: 'SBI92112341202' },
-  { id: 'p3', payoutId: 'PAY-8540-NX', date: '07 Jul 2026', amount: 10600, bank: 'State Bank of India (***2345)', status: 'Processed', utr: 'SBI91049581290' },
-];
 
 export default function QREarningsScreen({
   onNavigate,
@@ -71,32 +61,13 @@ export default function QREarningsScreen({
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    const loadData = async () => {
-      try {
-        const cachedEarnings = await getItem<any>('earnings_data');
-        if (cachedEarnings) {
-          setAvailableAmount(cachedEarnings.availableAmount);
-          setPendingAmount(cachedEarnings.pendingAmount);
-          setLifetimeAmount(cachedEarnings.lifetimeAmount);
-        } else {
-          await setItem('earnings_data', { availableAmount: 8400, pendingAmount: 3250, lifetimeAmount: 72450 });
-        }
-      } catch (err) {
-        console.error('Failed to load from IndexedDB', err);
-      }
-    };
-    loadData();
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  useEffect(() => {
-    setItem('earnings_data', { availableAmount, pendingAmount, lifetimeAmount }).catch(console.error);
-  }, [availableAmount, pendingAmount, lifetimeAmount]);
-  
+
   // App view controls
   const [activeFilter, setActiveFilter] = useState<'All' | 'Weekly' | 'Monthly'>('All');
   const [expandedSection, setExpandedSection] = useState<'shops' | 'payouts'>('shops');
@@ -105,10 +76,52 @@ export default function QREarningsScreen({
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutSuccess, setPayoutSuccess] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
-  const [withdrawAmountSim, setWithdrawAmountSim] = useState('8400');
   
   // Historic state
-  const [payouts, setPayouts] = useState<HistoricPayout[]>(HISTORIC_PAYOUTS);
+  const [payouts, setPayouts] = useState<HistoricPayout[]>([]);
+  const [shops, setShops] = useState<ShopEarning[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) return;
+        const [attribs, commissions, payoutRows] = await Promise.all([
+          fetchMyAttributions(supabase, String(partner.id)),
+          fetchCommissionEntries(supabase, String(partner.id)),
+          fetchMyPayouts(supabase, String(partner.id)),
+        ]);
+        if (cancelled) return;
+        setShops(attribs.map((a) => ({
+          id: String(a.id),
+          name: a.salon_name ?? 'Shop',
+          code: a.salon_name ?? '',
+          earnings: Math.round(commissions
+            .filter((c) => c.salonId === a.salon_id)
+            .reduce((sum, c) => sum + c.commissionPaise, 0) / 100),
+          transactions: commissions.filter((c) => c.salonId === a.salon_id).length,
+          status: (a.status === 'active' ? 'Qualifying' : 'Action Needed') as ShopEarning['status'],
+        })));
+        setPayouts(payoutRows.map((p) => ({
+          id: p.id,
+          payoutId: p.id.slice(0, 8).toUpperCase(),
+          date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          amount: Math.round(p.amountPaise / 100),
+          bank: 'Nexora payout',
+          status: (p.status === 'paid' ? 'Processed' : p.status === 'failed' ? 'Failed' : 'Initiated') as HistoricPayout['status'],
+          utr: p.id.slice(0, 12),
+        })));
+      } catch (err) {
+        console.warn('QR earnings load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -118,36 +131,11 @@ export default function QREarningsScreen({
     }, 3500);
   };
 
-  // Process a simulated withdrawal
+  // Read-only: no client-side money movement (Razorpay payout pipeline comes
+  // in a later phase per PDR). Payouts only ever appear from the server ledger.
   const handleInitiatePayout = () => {
-    const amt = parseFloat(withdrawAmountSim);
-    if (isNaN(amt) || amt <= 0 || amt > availableAmount) {
-      triggerToast('❌ Please enter a valid amount within your available balance.');
-      return;
-    }
-
-    setPayoutLoading(true);
+    triggerToast('Withdrawals are not available yet — payouts arrive via the secure payout pipeline in a later phase.');
     setShowPayoutModal(false);
-
-    // Simulate Server-Side payout validation & execution delay
-    setTimeout(() => {
-      setPayoutLoading(false);
-      setPayoutSuccess(true);
-      setAvailableAmount(prev => prev - amt);
-      setLifetimeAmount(prev => prev + amt);
-      
-      // Add to historic log
-      const newPayout: HistoricPayout = {
-        id: Math.random().toString(),
-        payoutId: `PAY-${Math.floor(1000 + Math.random() * 9000)}-NX`,
-        date: 'Today',
-        amount: amt,
-        bank: 'State Bank of India (***2345)',
-        status: 'Processed',
-        utr: `TXN${Math.floor(100000000000 + Math.random() * 900000000000)}`
-      };
-      setPayouts([newPayout, ...payouts]);
-    }, 2200);
   };
 
   return (
@@ -162,58 +150,6 @@ export default function QREarningsScreen({
       )}
 
       {/* Loading Overlay */}
-      {payoutLoading && (
-        <div className="fixed inset-0 z-110 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-2xl mb-4 relative overflow-hidden">
-            <div className="absolute inset-0 border-4 border-primary/20 rounded-3xl"></div>
-            <div className="absolute inset-0 border-4 border-t-primary rounded-3xl animate-spin"></div>
-            <DollarSign size={28} className="text-primary animate-pulse" />
-          </div>
-          <h3 className="text-white font-extrabold text-sm">Processing Instant Bank Settlement</h3>
-          <p className="text-gray-300 text-[11px] mt-1 max-w-xs">
-            Routing UPI payment to State Bank of India (***2345). Please don't close the application.
-          </p>
-        </div>
-      )}
-
-      {/* Payout Success Screen */}
-      {payoutSuccess && (
-        <div className="fixed inset-0 z-110 bg-white flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-4 border border-emerald-100 shadow-inner">
-            <CheckCircle2 size={36} className="stroke-[2.5px]" />
-          </div>
-          <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full uppercase tracking-wider">
-            Settlement Successful
-          </span>
-          <h3 className="text-gray-900 font-black text-lg mt-3">Commission Disbursed!</h3>
-          <p className="text-gray-500 text-xs mt-1 max-w-xs leading-relaxed">
-            ₹{withdrawAmountSim} has been successfully settled instantly under the UPI instant routing network to State Bank of India (***2345).
-          </p>
-
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 w-full max-w-xs my-6 text-left space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-400 font-semibold">Transaction UTR</span>
-              <span className="font-black text-gray-900 font-mono">UTRN92834710129</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 font-semibold">Settled Amount</span>
-              <span className="font-black text-primary">₹{withdrawAmountSim}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400 font-semibold">Destination bank</span>
-              <span className="font-bold text-gray-700">SBI (***2345)</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setPayoutSuccess(false)}
-            className="w-full max-w-xs bg-primary text-white h-12 rounded-2xl font-bold text-xs active:scale-98 transition-all cursor-pointer"
-          >
-            Back to Earnings
-          </button>
-        </div>
-      )}
-
       {/* Top Header */}
       <header className="sticky top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-xs h-16">
         <div className="max-w-screen-xl mx-auto w-full flex justify-between items-center px-[var(--page-margin)] h-16">
@@ -352,7 +288,7 @@ export default function QREarningsScreen({
                 <span>Calculated Earnings</span>
               </div>
 
-              {SH_EARNINGS_DATA.map((shop) => (
+              {shops.map((shop) => (
                 <div
                   key={shop.id}
                   className="bg-white p-4 rounded-3xl border border-gray-200/50 shadow-xs flex justify-between items-center hover:shadow-md transition-shadow cursor-pointer"
@@ -420,82 +356,6 @@ export default function QREarningsScreen({
         </section>
 
       </main>
-
-      {/* Instant Settlement Withdrawal Dialog Modal */}
-      {showPayoutModal && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
-            onClick={() => setShowPayoutModal(false)}
-          ></div>
-
-          <div className="relative bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95">
-            {/* Modal Header */}
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-wider">
-                <Sparkles size={16} />
-                <span>Instant settlement</span>
-              </div>
-              <button
-                onClick={() => setShowPayoutModal(false)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-full transition-colors"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 space-y-4">
-              <div className="text-center pb-2">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Available Balance</p>
-                <p className="text-2xl font-black text-gray-900 mt-0.5">₹{availableAmount.toLocaleString()}</p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Withdraw Amount (₹)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">₹</span>
-                  <input
-                    type="number"
-                    value={withdrawAmountSim}
-                    onChange={(e) => setWithdrawAmountSim(e.target.value)}
-                    max={availableAmount}
-                    className="w-full h-11 pl-7 pr-3 bg-gray-50 border-none rounded-2xl font-bold text-xs focus:ring-1 focus:ring-primary/20 text-gray-950"
-                    placeholder="Enter amount"
-                  />
-                </div>
-                <div className="flex justify-between pt-1">
-                  <button
-                    onClick={() => setWithdrawAmountSim((availableAmount / 2).toString())}
-                    className="text-[10px] font-bold text-gray-400 hover:text-primary"
-                  >
-                    50% (₹{availableAmount / 2})
-                  </button>
-                  <button
-                    onClick={() => setWithdrawAmountSim(availableAmount.toString())}
-                    className="text-[10px] font-bold text-primary hover:underline"
-                  >
-                    Withdraw All
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-[11px] text-gray-600 space-y-1">
-                <p className="font-bold text-gray-800">Direct Bank Destination</p>
-                <p>Bank Name: <strong>State Bank of India</strong></p>
-                <p>Account ID: <strong>*****2345 (Primary Onboarded Bank)</strong></p>
-              </div>
-
-              <button
-                onClick={handleInitiatePayout}
-                className="w-full bg-primary text-white h-11 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
-              >
-                <CheckCircle2 size={14} /> Disburse to Bank Account
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bottom Nav bar component */}
       <BottomNav onNavigate={onNavigate} currentPage="earnings" />

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -24,6 +24,8 @@ import {
   RotateCw
 } from 'lucide-react';
 import { copyToClipboard } from '../../utils/clipboard';
+import { supabase } from '../../lib/supabaseClient';
+import { updatePartnerProfile } from '../../lib/gpRepository';
 import Avatar from '../Avatar';
 import { toPng } from 'html-to-image';
 import BottomNav from './BottomNav';
@@ -38,42 +40,58 @@ export default function ProfileScreen({
   onNavigate?: (page: string) => void;
   onLogout?: () => void;
 }) {
-  // Load saved profile details, fallback to original details
-  const [profile, setProfile] = useState(() => {
-    const saved = localStorage.getItem('nexora_partner_profile');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // Fallback below
-      }
-    }
-    return {
-      name: 'Rajesh Kumar',
-      dob: '1988-08-14', // ISO date for input ease
-      mobile: '+91 98321 45678',
-      email: 'r.kumar@example.com',
-      address: 'Ajmer Road, Jaipur, Rajasthan, 302006',
-      alternateMobile: '',
-      profileImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAAeigYb6tOYh_NW0aJ-wsYDyIsuZyXV98e49VD8omzpJ2muriuTeHAR_-2EkRvjduZZugEA3cl-D-oph6IwNrFVDCR87nbdXHqaASveZ2kWPgPSzMMcTkiW437g7PSpFqV2mOOgwz-EqmErgMeEYFzxswmGlBWsxnD6OVyA4zzLTuAfEocBnTEsFnkYu0JU2jhjOVKGnoRtUgVh5s8i7tL1JYpjH6h_2Wk4snbU_fkcS6UeC7PeAGG'
-    };
+  // Live profile from auth + shared profiles table (no localStorage fake).
+  const [profile, setProfile] = useState<any>({
+    name: '',
+    dob: '',
+    mobile: '',
+    email: '',
+    address: '',
+    alternateMobile: '',
+    profileImage: '',
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const { data: row } = await supabase
+          .from('profiles')
+          .select('full_name, phone, avatar_path')
+          .eq('id', user.id)
+          .maybeSingle();
+        setProfile({
+          name: row?.full_name || user.user_metadata?.full_name || '',
+          dob: '',
+          mobile: row?.phone || user.phone || '',
+          email: user.email || '',
+          address: '',
+          alternateMobile: '',
+          profileImage: '',
+        });
+      } catch (err) {
+        console.warn('Profile load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Local preview only — storage buckets are not provisioned yet (backend
+    // blocker); the avatar is not silently persisted as fake server data.
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const updated = {
-          ...profile,
-          profileImage: base64String
-        };
-        setProfile(updated);
-        localStorage.setItem('nexora_partner_profile', JSON.stringify(updated));
-        triggerToast('Profile photo updated!');
+        setProfile((prev: any) => ({ ...prev, profileImage: reader.result as string }));
+        triggerToast('Photo preview set (avatar uploads come with storage in a later phase)');
       };
       reader.readAsDataURL(file);
     }
@@ -166,8 +184,8 @@ export default function ProfileScreen({
   // Status banners / toast states
   const [toastMessage, setToastMessage] = useState('');
 
-  // Update profile in localStorage and local state
-  const handleSaveProfile = (e: React.FormEvent) => {
+  // Update profile in the shared profiles table (RLS: own row only).
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const updated = {
       ...profile,
@@ -178,9 +196,16 @@ export default function ProfileScreen({
       address: editAddress
     };
     setProfile(updated);
-    localStorage.setItem('nexora_partner_profile', JSON.stringify(updated));
+    try {
+      await updatePartnerProfile(supabase!, {
+        full_name: editName || profile.name,
+        phone: editMobile || null,
+      });
+      triggerToast('Profile updated successfully!');
+    } catch (err: any) {
+      triggerToast(err?.message || 'Could not save profile.');
+    }
     setIsEditOpen(false);
-    triggerToast('Profile updated successfully!');
   };
 
   const handleSaveAltPhone = (e: React.FormEvent) => {
@@ -194,9 +219,8 @@ export default function ProfileScreen({
       alternateMobile: altPhone
     };
     setProfile(updated);
-    localStorage.setItem('nexora_partner_profile', JSON.stringify(updated));
     setIsCompleteOpen(false);
-    triggerToast('Alternate phone added! Profile is now 100% complete.');
+    triggerToast('Alternate phone saved for this session.');
   };
 
   const handleRemoveAltPhone = () => {
@@ -206,7 +230,6 @@ export default function ProfileScreen({
     };
     setAltPhone('');
     setProfile(updated);
-    localStorage.setItem('nexora_partner_profile', JSON.stringify(updated));
     triggerToast('Alternate mobile removed.');
   };
 

@@ -22,6 +22,8 @@ import {
   Inbox
 } from 'lucide-react';
 import BottomNav from './BottomNav';
+import { supabase } from '../../lib/supabaseClient';
+import { fetchPartnerNotifications } from '../../lib/gpRepository';
 
 export type NotificationCategory = 'All' | 'Payments' | 'Support' | 'System';
 
@@ -36,88 +38,7 @@ export interface NotificationItem {
   buttonLabel: string;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'n1',
-    title: 'Glow Beauty Parlour completed Day 9 QR target',
-    message: 'Achieved 15 valid scans today. Bonus tier progress +5%.',
-    time: '2h ago',
-    unread: true,
-    category: 'System',
-    type: 'qr',
-    buttonLabel: 'View Shop'
-  },
-  {
-    id: 'n2',
-    title: '₹7,850 Payout credited to HDFC Bank',
-    message: 'Bank Ref #UPI98342110. Weekly merchant settlement complete.',
-    time: '3h ago',
-    unread: true,
-    category: 'Payments',
-    type: 'payout',
-    buttonLabel: 'View Receipt'
-  },
-  {
-    id: 'n3',
-    title: 'Support Ticket #4082 Resolved',
-    message: 'Merchant QR display stand replacement dispatched via BlueDart courier.',
-    time: '5h ago',
-    unread: false,
-    category: 'Support',
-    type: 'support',
-    buttonLabel: 'View Ticket'
-  },
-  {
-    id: 'n4',
-    title: 'Royal Cut Salon missed today’s ₹1,000 target',
-    message: 'Total volume reached ₹650. Nudge owner to showcase counter QR.',
-    time: '6h ago',
-    unread: false,
-    category: 'System',
-    type: 'shop',
-    buttonLabel: 'View Shop'
-  },
-  {
-    id: 'n5',
-    title: '₹1,200 Onboarding Commission Received',
-    message: 'Successfully verified 3 new beauty salons in Sector 18.',
-    time: '1d ago',
-    unread: true,
-    category: 'Payments',
-    type: 'payment',
-    buttonLabel: 'View Earnings'
-  },
-  {
-    id: 'n6',
-    title: 'Merchant Assistance Request: Soundbox Speaker',
-    message: 'Unique Unisex Salon requested urgent technician help for audio alert speaker.',
-    time: '1d ago',
-    unread: false,
-    category: 'Support',
-    type: 'support',
-    buttonLabel: 'Contact Salon'
-  },
-  {
-    id: 'n7',
-    title: 'Electric Scooter Target: 247/300 Shops Onboarded',
-    message: 'You are 53 active shops away from claiming the quarterly mega reward.',
-    time: '2d ago',
-    unread: false,
-    category: 'System',
-    type: 'reward',
-    buttonLabel: 'View Progress'
-  },
-  {
-    id: 'n8',
-    title: 'Scheduled System Maintenance Notice',
-    message: 'Core database optimization planned for Sunday 2:00 AM - 4:00 AM IST.',
-    time: '3d ago',
-    unread: false,
-    category: 'System',
-    type: 'system',
-    buttonLabel: 'Details'
-  }
-];
+
 
 const CATEGORY_TABS: { id: NotificationCategory; label: string; icon: React.ElementType }[] = [
   { id: 'All', label: 'All Alerts', icon: Bell },
@@ -135,7 +56,34 @@ export default function NotificationsScreen({ onBack, onNavigate }: Notification
   const [activeTab, setActiveTab] = useState<NotificationCategory>('All');
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const rows = await fetchPartnerNotifications(supabase, user.id);
+        if (cancelled) return;
+        setNotifications(rows.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          time: n.createdAt ? new Date(n.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
+          unread: !n.read,
+          category: (n.type === 'payment' || n.type === 'payout' ? 'Payments' : n.type === 'support' ? 'Support' : 'System') as NotificationItem['category'],
+          type: (n.type === 'payout' || n.type === 'payment' ? 'payout' : n.type === 'support' ? 'support' : 'system') as NotificationItem['type'],
+          buttonLabel: '',
+        })));
+      } catch (err) {
+        console.warn('Notifications load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);

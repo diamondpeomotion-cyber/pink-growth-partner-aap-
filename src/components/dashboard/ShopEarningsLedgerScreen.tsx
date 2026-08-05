@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchCommissionEntries } from '../../lib/gpRepository';
 import {
   ArrowLeft,
   Search,
@@ -37,72 +39,7 @@ interface LedgerItem {
 }
 
 // Initial structured data exactly matching the user's template layout and card values
-const INITIAL_LEDGER_ITEMS: LedgerItem[] = [
-  {
-    id: 'ledger-001',
-    shopName: 'Glow Beauty Parlour',
-    shopCode: 'NX-SHOP-0247',
-    status: 'Available',
-    type: 'standard',
-    amount: 50,
-    date: '25 Jul 2026',
-    cycle: '27 Jul–02 Aug 2026',
-    calculation: {
-      qrRevenue: 5000,
-      platformFee: 500,
-      partnerShare: 50
-    }
-  },
-  {
-    id: 'ledger-002',
-    shopName: 'Urban Spa',
-    shopCode: 'NX-SHOP-0225',
-    status: 'Pending',
-    type: 'standard',
-    amount: 80,
-    date: '25 Jul 2026'
-  },
-  {
-    id: 'ledger-003',
-    shopName: 'Style Studio',
-    shopCode: 'NX-SHOP-0218',
-    status: 'Paid',
-    type: 'standard',
-    amount: 100,
-    date: '24 Jul 2026',
-    payoutId: 'PAY-GP-0726'
-  },
-  {
-    id: 'ledger-004',
-    shopName: 'Royal Cut Salon',
-    shopCode: 'NX-SHOP-0248',
-    status: 'Reversed',
-    type: 'standard',
-    amount: -30,
-    date: '24 Jul 2026',
-    reversalReason: 'Customer payment refunded'
-  },
-  {
-    id: 'ledger-005',
-    shopName: 'Bella Beauty Studio',
-    shopCode: 'NX-SHOP-0311',
-    status: 'Available',
-    type: 'Activation Earning',
-    amount: 150,
-    date: '22 Jul 2026',
-    banner: 'Unlocked after 15-day qualification'
-  },
-  {
-    id: 'ledger-006',
-    shopName: 'Urban Spa',
-    shopCode: 'NX-SHOP-0225',
-    status: 'Available',
-    type: 'Recurring Growth Share',
-    amount: 200,
-    date: '20 Jul 2026',
-    banner: 'Month 4 Commission'
-  }
-];
+
 
 export default function ShopEarningsLedgerScreen({
   onNavigate,
@@ -111,71 +48,71 @@ export default function ShopEarningsLedgerScreen({
   onNavigate: (page: string) => void;
   onBack?: () => void;
 }) {
-  const [ledgerItems, setLedgerItems] = useState<LedgerItem[]>(INITIAL_LEDGER_ITEMS);
+  const [ledgerItems, setLedgerItems] = useState<LedgerItem[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'Pending' | 'Available' | 'Paid' | 'Reversed'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Dynamic bottom sheet calculation modal
   const [calculationTx, setCalculationTx] = useState<LedgerItem | null>(null);
   
-  // Custom interactive simulator
-  const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
-  const [simShop, setSimShop] = useState('Glow Beauty Parlour');
-  const [simAmount, setSimAmount] = useState('12000');
-  const [simStatus, setSimStatus] = useState<'Available' | 'Pending' | 'Paid' | 'Reversed'>('Available');
-  const [simType, setSimType] = useState<'standard' | 'Activation Earning' | 'Recurring Growth Share'>('standard');
-  const [simCustomerName, setSimCustomerName] = useState('Walk-in Customer');
-
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) { setLedgerItems([]); return; }
+        const rows = await fetchCommissionEntries(supabase, String(partner.id));
+        if (cancelled) return;
+        setLedgerItems(rows.map((c) => ({
+          id: c.id,
+          shopName: 'Shop',
+          shopCode: '',
+          status: (c.status === 'held' ? 'Pending' : c.status === 'payable' ? 'Available' : c.status === 'paid' ? 'Paid' : 'Reversed') as LedgerItem['status'],
+          type: 'standard',
+          amount: Math.round(c.commissionPaise / 100),
+          date: c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          cycle: c.holdUntil ? 'Hold till ' + new Date(c.holdUntil).toLocaleDateString('en-GB') : undefined,
+          payoutId: c.bookingId ?? undefined,
+        })));
+      } catch (err) {
+        console.warn('Ledger load failed:', err);
+      } finally {
+        if (!cancelled) setLedgerLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Base state values from the HTML design document to maintain consistent values
-  const baseAvailable = 8400;
-  const basePending = 3250;
-  const basePaid = 59600;
-  const baseReversed = 450;
-
-  // Compute dynamic stats over the initial template base plus any added simulation items
+  // Live stats from the actual commission ledger (no hardcoded base).
   const stats = useMemo(() => {
-    // Filter only new user-created simulated items (not matching initial IDs)
-    const simulatedItems = ledgerItems.filter(item => !INITIAL_LEDGER_ITEMS.some(init => init.id === item.id));
-    
-    const simAvailable = simulatedItems
-      .filter(item => item.status === 'Available')
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    const simPending = simulatedItems
-      .filter(item => item.status === 'Pending')
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    const simPaid = simulatedItems
-      .filter(item => item.status === 'Paid')
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    const simReversed = simulatedItems
-      .filter(item => item.status === 'Reversed')
-      .reduce((sum, item) => sum + Math.abs(item.amount), 0);
-
     return {
-      available: baseAvailable + simAvailable,
-      pending: basePending + simPending,
-      paid: basePaid + simPaid,
-      reversed: baseReversed + simReversed
+      available: ledgerItems.filter(i => i.status === 'Available').reduce((sum, i) => sum + i.amount, 0),
+      pending: ledgerItems.filter(i => i.status === 'Pending').reduce((sum, i) => sum + i.amount, 0),
+      paid: ledgerItems.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.amount, 0),
+      reversed: ledgerItems.filter(i => i.status === 'Reversed').reduce((sum, i) => sum + Math.abs(i.amount), 0)
     };
   }, [ledgerItems]);
 
   // Compute dynamic filter counts for display in pills
   const counts = useMemo(() => {
     return {
-      all: ledgerItems.length + 78, // Sums up to 84 matching the HTML Template
-      pending: ledgerItems.filter(i => i.status === 'Pending').length + 10, // Sums to 12
-      available: ledgerItems.filter(i => i.status === 'Available').length + 14, // Sums to 18
-      paid: ledgerItems.filter(i => i.status === 'Paid').length + 49, // Sums to 51
-      reversed: ledgerItems.filter(i => i.status === 'Reversed').length + 1 // Sums to 3
+      all: ledgerItems.length,
+      pending: ledgerItems.filter(i => i.status === 'Pending').length,
+      available: ledgerItems.filter(i => i.status === 'Available').length,
+      paid: ledgerItems.filter(i => i.status === 'Paid').length,
+      reversed: ledgerItems.filter(i => i.status === 'Reversed').length
     };
   }, [ledgerItems]);
 
@@ -190,52 +127,6 @@ export default function ShopEarningsLedgerScreen({
       return matchesFilter && matchesSearch;
     });
   }, [ledgerItems, selectedFilter, searchQuery]);
-
-  const handleSimulateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amtValue = parseFloat(simAmount);
-    if (isNaN(amtValue) || amtValue <= 0) {
-      triggerToast('❌ Please provide a valid transaction amount');
-      return;
-    }
-
-    const shopCodeMap: Record<string, string> = {
-      'Glow Beauty Parlour': 'NX-SHOP-0247',
-      'Urban Spa': 'NX-SHOP-0225',
-      'Royal Cut Salon': 'NX-SHOP-0248',
-      'Style Studio': 'NX-SHOP-0218',
-      'Bella Beauty Studio': 'NX-SHOP-0311'
-    };
-
-    // 1% flat commission simulation or specific growth amount
-    let commissionAmt = Number((amtValue * 0.01).toFixed(2));
-    if (simStatus === 'Reversed') {
-      commissionAmt = -commissionAmt;
-    }
-
-    const newItem: LedgerItem = {
-      id: `sim-${Date.now()}`,
-      shopName: simShop,
-      shopCode: shopCodeMap[simShop] || 'NX-SHOP-9999',
-      status: simStatus,
-      type: simType,
-      amount: commissionAmt,
-      date: 'Today',
-      cycle: simStatus === 'Available' ? '27 Jul–02 Aug 2026' : undefined,
-      payoutId: simStatus === 'Paid' ? `PAY-GP-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-      reversalReason: simStatus === 'Reversed' ? 'Customer requested scan refund' : undefined,
-      banner: simType === 'Activation Earning' ? 'Unlocked after 15-day qualification' : simType === 'Recurring Growth Share' ? 'Month 4 Commission' : undefined,
-      calculation: {
-        qrRevenue: amtValue,
-        platformFee: amtValue * 0.1,
-        partnerShare: commissionAmt
-      }
-    };
-
-    setLedgerItems([newItem, ...ledgerItems]);
-    setShowSimulateModal(false);
-    triggerToast(`🎉 New ${simStatus} ledger transaction simulated successfully!`);
-  };
 
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100">
@@ -267,12 +158,6 @@ export default function ShopEarningsLedgerScreen({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowSimulateModal(true)}
-              className="bg-primary hover:bg-primary-container text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
-            >
-              <Plus size={14} /> <span>Simulate</span>
-            </button>
           </div>
         </div>
       </header>
@@ -648,98 +533,6 @@ export default function ShopEarningsLedgerScreen({
 
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Simulator Modal for creating ledger items */}
-      {showSimulateModal && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
-            onClick={() => setShowSimulateModal(false)}
-          ></div>
-
-          <form
-            onSubmit={handleSimulateSubmit}
-            className="relative bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95"
-          >
-            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-wider">
-                <Sparkles size={16} className="text-pink-500" />
-                <span>Simulate Ledger Transaction</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSimulateModal(false)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-full transition-colors"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Target Shop</label>
-                <select
-                  value={simShop}
-                  onChange={(e) => setSimShop(e.target.value)}
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                >
-                  <option value="Glow Beauty Parlour">Glow Beauty Parlour (NX-SHOP-0247)</option>
-                  <option value="Urban Spa">Urban Spa (NX-SHOP-0225)</option>
-                  <option value="Royal Cut Salon">Royal Cut Salon (NX-SHOP-0248)</option>
-                  <option value="Style Studio">Style Studio (NX-SHOP-0218)</option>
-                  <option value="Bella Beauty Studio">Bella Beauty Studio (NX-SHOP-0311)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Customer Base QR Scan Amount (₹)</label>
-                <input
-                  type="number"
-                  value={simAmount}
-                  onChange={(e) => setSimAmount(e.target.value)}
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                  placeholder="e.g. 12000"
-                />
-                <span className="text-[9px] text-gray-400 block font-medium">Your GP commission is calculated at a flat 1.0% of this scan amount</span>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Commission Status</label>
-                <select
-                  value={simStatus}
-                  onChange={(e) => setSimStatus(e.target.value as any)}
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                >
-                  <option value="Available">Available</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Reversed">Reversed</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Earnings Type</label>
-                <select
-                  value={simType}
-                  onChange={(e) => setSimType(e.target.value as any)}
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                >
-                  <option value="standard">Standard Scan Share (1.0%)</option>
-                  <option value="Activation Earning">New Activation Earning Bonus</option>
-                  <option value="Recurring Growth Share">Recurring Growth share</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-primary text-white h-11 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1.5"
-              >
-                <CheckCircle2 size={14} /> Simulate Transaction
-              </button>
-            </div>
-          </form>
         </div>
       )}
 

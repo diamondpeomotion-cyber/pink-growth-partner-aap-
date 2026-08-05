@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import rewardScooter from '../../assets/images/reward-scooter.jpg';
 import BottomNav from './BottomNav';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions } from '../../lib/gpRepository';
 
 interface RewardShop {
   id: string;
@@ -29,14 +31,7 @@ interface RewardShop {
   daysRemaining?: number;
 }
 
-const INITIAL_SHOPS: RewardShop[] = [
-  { id: 'rs-1', name: 'Bella Beauty Studio', code: 'NX-SHOP-0311', status: 'Verified', onboardedDate: '10 Jul 2026', activeScansCount: 45 },
-  { id: 'rs-2', name: 'Glow Beauty Parlour', code: 'NX-SHOP-0247', status: 'Verified', onboardedDate: '08 Jul 2026', activeScansCount: 22 },
-  { id: 'rs-3', name: 'Style Studio', code: 'NX-SHOP-0218', status: 'Verified', onboardedDate: '05 Jul 2026', activeScansCount: 19 },
-  { id: 'rs-4', name: 'Golden Scissors', code: 'NX-SHOP-0412', status: 'Verified', onboardedDate: '01 Jul 2026', activeScansCount: 31 },
-  { id: 'rs-5', name: 'Urban Spa', code: 'NX-SHOP-0225', status: 'Pending', onboardedDate: '24 Jul 2026', activeScansCount: 8, daysRemaining: 7 },
-  { id: 'rs-6', name: 'Royal Cut Salon', code: 'NX-SHOP-0248', status: 'Pending', onboardedDate: '25 Jul 2026', activeScansCount: 12, daysRemaining: 3 }
-];
+
 
 export default function RewardsScreen({
   onNavigate,
@@ -45,16 +40,38 @@ export default function RewardsScreen({
   onNavigate: (page: string) => void;
   onBack: () => void;
 }) {
-  const [qualifyingCount, setQualifyingCount] = useState<number>(() => {
-    const saved = localStorage.getItem('simulatedQualifyingCount');
-    return saved ? parseInt(saved) || 247 : 247;
-  });
+  // Live qualifying count: active shops attributed to this partner.
+  const [qualifyingCount, setQualifyingCount] = useState<number>(0);
+  const [allShops, setAllShops] = useState<RewardShop[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('simulatedQualifyingCount', qualifyingCount.toString());
-  }, [qualifyingCount]);
-
-  const [allShops, setAllShops] = useState<RewardShop[]>(INITIAL_SHOPS);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) return;
+        const rows = await fetchMyAttributions(supabase, String(partner.id));
+        if (cancelled) return;
+        const active = rows.filter((a) => a.status === 'active');
+        setQualifyingCount(active.length);
+        setAllShops(active.map((a) => ({
+          id: String(a.id),
+          name: a.salon_name ?? 'Shop',
+          code: a.salon_name ?? '',
+          status: 'Verified' as const,
+          onboardedDate: a.effective_from ? new Date(a.effective_from).toISOString().slice(0, 10) : '',
+          activeScansCount: 0,
+        })));
+      } catch (err) {
+        console.warn('Rewards progress load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
   
   // Modal controllers
   const [showHowItWorks, setShowHowItWorks] = useState(false);

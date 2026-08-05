@@ -114,7 +114,7 @@ export default function ShopQualificationDetails({
   // Predefined templates for WhatsApp reach out
   const handleSendReminder = (lang: 'hi' | 'en') => {
     const message = lang === 'hi'
-      ? `नमस्ते सुनिता जी! आपके "Glow Beauty Parlour" का आज का क्वालिफिकेशन पूरा करने के लिए केवल ₹${deficit} का ट्रांजैक्शन बाकी है। कृपया आज रात 12 बजे से पहले इसे पूरा करें ताकि आपकी 15-दिन की कमाई श्रृंखला चालू रहे। धन्यवाद!`
+      ? `नमस्ते! आपके सैलून का आज का क्वालिफिकेशन पूरा करने के लिए केवल ₹${deficit} का ट्रांजैक्शन बाकी है। कृपया आज रात 12 बजे से पहले इसे पूरा करें ताकि आपकी 15-दिन की कमाई श्रृंखला चालू रहे। धन्यवाद!`
       : `Hello Sunita! Your shop "Glow Beauty Parlour" needs only ₹${deficit} more in QR payments to clear today's limit. Please process a payment before midnight to secure your 15-day streak reward!`;
     
     const encoded = encodeURIComponent(message);
@@ -123,7 +123,7 @@ export default function ShopQualificationDetails({
   };
 
   const handleCallMerchant = () => {
-    alert("Initiating simulator call to +91 98765 12345 (Sunita Sharma)...");
+    alert("WhatsApp reminder ready to send.");
     setCallLog([`Dialed merchant: promised to route ₹${deficit} client payment at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, ...callLog]);
     triggerNotification("📞 Call logged in your Growth Partner CRM history.");
   };
@@ -150,7 +150,7 @@ export default function ShopQualificationDetails({
               <ArrowLeft size={20} className="stroke-[2.5px]" />
             </button>
             <div>
-              <h1 className="text-base font-black text-gray-900 tracking-tight">Glow Beauty Parlour</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight">Shop Qualification</h1>
               <span className="text-[10px] text-gray-400 font-semibold uppercase block">Qualification Details</span>
             </div>
           </div>

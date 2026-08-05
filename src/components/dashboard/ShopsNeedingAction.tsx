@@ -1,17 +1,49 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { CheckCircle, QrCode, TrendingDown, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions, fetchMyProposals } from '../../lib/gpRepository';
 
 export default function ShopsNeedingAction({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
+  const [actions, setActions] = useState([
+    { title: 'KYC Pending', count: '0 Shops', icon: CheckCircle, color: '#ed6c02', bg: 'bg-[#ed6c02]/10', btn: 'Review KYC', page: 'shops' },
+    { title: 'QR Not Active', count: '0 Shops', icon: QrCode, color: '#0052da', bg: 'bg-[#0052da]/10', btn: 'Activate QR', page: 'scan-qr' },
+    { title: 'Under Review', count: '0 Shops', icon: TrendingDown, color: '#ed6c02', bg: 'bg-[#ed6c02]/10', btn: 'View Status', page: 'earnings' },
+    { title: 'Draft Proposals', count: '0 Shops', icon: Pencil, color: '#b90064', bg: 'bg-[#b90064]/10', btn: 'Continue', page: 'shops' },
+  ]);
 
-  const actions = [
-    { title: 'KYC Pending', count: '4 Shops', icon: CheckCircle, color: '#ed6c02', bg: 'bg-[#ed6c02]/10', btn: 'Review KYC', page: 'shops' },
-    { title: 'QR Not Active', count: '2 Shops', icon: QrCode, color: '#0052da', bg: 'bg-[#0052da]/10', btn: 'Activate QR', page: 'scan-qr' },
-    { title: 'Target Failed', count: '7 Shops', icon: TrendingDown, color: '#ed6c02', bg: 'bg-[#ed6c02]/10', btn: 'View Stats', page: 'earnings' },
-    { title: 'Need Changes', count: '3 Shops', icon: Pencil, color: '#b90064', bg: 'bg-[#b90064]/10', btn: 'Fix Issues', page: 'shops' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const partner = await resolveGrowthPartner(supabase, user.id);
+        if (!partner || cancelled) return;
+        const [attribs, proposals] = await Promise.all([
+          fetchMyAttributions(supabase, String(partner.id)),
+          fetchMyProposals(supabase, String(partner.id)),
+        ]);
+        if (cancelled) return;
+        const active = attribs.filter((a) => a.status === 'active').length;
+        const underReview = proposals.filter((p) => p.status === 'submitted' || p.status === 'approved').length;
+        const drafts = proposals.filter((p) => p.status === 'draft' || p.status === 'changes_requested').length;
+        setActions([
+          { title: 'Active Shops', count: `${active} Shops`, icon: CheckCircle, color: '#2e7d32', bg: 'bg-[#2e7d32]/10', btn: 'View Shops', page: 'shops' },
+          { title: 'Under Review', count: `${underReview} Shops`, icon: TrendingDown, color: '#ed6c02', bg: 'bg-[#ed6c02]/10', btn: 'View Status', page: 'earnings' },
+          { title: 'Draft Proposals', count: `${drafts} Shops`, icon: Pencil, color: '#b90064', bg: 'bg-[#b90064]/10', btn: 'Continue', page: 'shops' },
+          { title: 'QR Not Active', count: '0 Shops', icon: QrCode, color: '#0052da', bg: 'bg-[#0052da]/10', btn: 'Activate QR', page: 'scan-qr' },
+        ]);
+      } catch (err) {
+        console.warn('Shops needing action load failed:', err);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleScroll = () => {
     if (scrollRef.current) {

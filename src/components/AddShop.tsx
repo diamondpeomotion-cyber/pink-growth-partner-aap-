@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import MapPreview from './MapPreview';
 import CancellationPolicyModal from './CancellationPolicyModal';
+import { supabase } from '../lib/supabaseClient';
+import { submitShopApplication } from '../lib/gpRepository';
 import { 
   ArrowLeft, 
   User, 
@@ -149,23 +151,23 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [showStepper, setShowStepper] = useState(true);
 
   // Step 1 State: Owner Details
-  const [ownerName, setOwnerName] = useState(() => draft.ownerName ?? 'Sunita Sharma');
-  const [mobileNumber, setMobileNumber] = useState(() => draft.mobileNumber ?? '9876512345');
-  const [whatsappNumber, setWhatsappNumber] = useState(() => draft.whatsappNumber ?? '9876512345');
+  const [ownerName, setOwnerName] = useState(() => draft.ownerName ?? '');
+  const [mobileNumber, setMobileNumber] = useState(() => draft.mobileNumber ?? '');
+  const [whatsappNumber, setWhatsappNumber] = useState(() => draft.whatsappNumber ?? '');
   const [sameAsMobile, setSameAsMobile] = useState(() => draft.sameAsMobile ?? true);
-  const [email, setEmail] = useState(() => draft.email ?? 'sunita@glowbeauty.com');
+  const [email, setEmail] = useState(() => draft.email ?? '');
   const [preferredLang, setPreferredLang] = useState(() => draft.preferredLang ?? 'hi');
-  const [isVerified, setIsVerified] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpValues, setOtpValues] = useState(['1', '2', '3', '4', '5', '6']);
-  const [dupCheckStatus, setDupCheckStatus] = useState<'none' | 'success' | 'warning'>('success');
+  const [dupCheckStatus, setDupCheckStatus] = useState<'none' | 'success' | 'warning'>('none');
   const [draftSaved, setDraftSaved] = useState(false);
 
   // Step 2 State: Shop & Location Details
-  const [shopName, setShopName] = useState(() => draft.shopName ?? 'Glow Beauty Parlour');
-  const [shopCategory, setShopCategory] = useState(() => draft.shopCategory ?? 'Beauty Parlour');
+  const [shopName, setShopName] = useState(() => draft.shopName ?? '');
+  const [shopCategory, setShopCategory] = useState(() => draft.shopCategory ?? '');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [locationDetected, setLocationDetected] = useState(true);
+  const [locationDetected, setLocationDetected] = useState(false);
   
   const [stateName, setStateName] = useState(() => draft.stateName ?? 'Rajasthan');
   const [districtName, setDistrictName] = useState(() => draft.districtName ?? 'Jaipur');
@@ -191,7 +193,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     { name: 'Facial', price: '1,200', duration: '60 mins' },
     { name: 'Hair Colour', price: '2,500', duration: '90 mins' },
   ]);
-  const [aboutShop, setAboutShop] = useState('Glow Beauty Parlour offers professional beauty, hair and bridal services in Mansarovar, Jaipur.');
+  const [aboutShop, setAboutShop] = useState('');
   const [isAddingService, setIsAddingService] = useState(false);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
@@ -668,6 +670,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   // Anchor inside the form, used to locate the scrolling shell container.
   const formTopRef = useRef<HTMLDivElement>(null);
   const [highlightPrivacyConsent, setHighlightPrivacyConsent] = useState(false);
+  const [submittingApp, setSubmittingApp] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [step6Confirmed, setStep6Confirmed] = useState<boolean>(false);
   const [policyConfirmed, setPolicyConfirmed] = useState<boolean>(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState<boolean>(false);
@@ -1753,7 +1757,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   <Store className="text-primary" size={20} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-base">{shopName || 'Glow Beauty Parlour'}</h3>
+                  <h3 className="font-semibold text-gray-900 text-base">{shopName || 'Your salon'}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">{shopCategory} • {localityName}, {cityName}</p>
                   <div className="flex items-center gap-1 mt-2 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full w-max text-xs font-medium">
                     <CheckCircle2 size={13} className="text-emerald-600" />
@@ -2026,7 +2030,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                     <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>storefront</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-[18px]">{shopName || 'Glow Beauty Parlour'}</h3>
+                    <h3 className="font-semibold text-gray-900 text-[18px]">{shopName || 'Your salon'}</h3>
                     <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
                       <span className="material-symbols-outlined text-[16px]">location_on</span> {localityName || 'Mansarovar'}, {cityName || 'Jaipur'}
                     </p>
@@ -2853,7 +2857,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                       </div>
                     </div>
                     <div className="pt-8 px-4 pb-4">
-                      <h4 className="text-sm font-bold text-gray-900">{shopName || 'Glow Beauty Parlour'}</h4>
+                      <h4 className="text-sm font-bold text-gray-900">{shopName || 'Your salon'}</h4>
                       <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">location_on</span> {localityName || 'Mansarovar'}, {cityName || 'Jaipur'}</p>
                       <div className="mt-3 bg-pink-50 rounded-lg p-2 flex justify-between items-center">
                         <span className="text-[10px] font-semibold text-primary">Starting Price</span>
@@ -2940,11 +2944,11 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
               <div className="flex justify-between items-start ml-2">
                 <div>
-                  <h3 className="font-bold text-gray-900 text-base mb-1">{shopName || 'Glow Beauty Parlour'}</h3>
+                  <h3 className="font-bold text-gray-900 text-base mb-1">{shopName || 'Your salon'}</h3>
                   <p className="text-xs text-gray-500 flex flex-col gap-1">
                     <span className="flex items-center gap-1.5">
                       <User size={14} className="opacity-70 text-gray-500" />
-                      <span>Owner: {ownerName || 'Sunita Sharma'}</span>
+                      <span>Owner: {ownerName || 'Owner'}</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <MapPin size={14} className="opacity-70 text-gray-500" />
@@ -3458,7 +3462,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-2">
                     <div>
                       <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Full Name</span>
-                      <span className="text-sm font-bold text-gray-900">{ownerName || 'Sunita Sharma'}</span>
+                      <span className="text-sm font-bold text-gray-900">{ownerName || 'Owner'}</span>
                     </div>
                     <div>
                       <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Language</span>
@@ -3501,7 +3505,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-2">
                     <div>
                       <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Shop Name</span>
-                      <span className="text-sm font-bold text-gray-900">{shopName || 'Glow Beauty Parlour'}</span>
+                      <span className="text-sm font-bold text-gray-900">{shopName || 'Your salon'}</span>
                     </div>
                     <div>
                       <span className="text-[11px] font-semibold text-gray-400 block mb-0.5 uppercase tracking-wider">Category</span>
@@ -3940,13 +3944,32 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
           ) : (
             <button 
               type="button"
-              disabled={!step6Confirmed || !policyConfirmed}
-              onClick={() => {
-                alert(`Shop registration details for "${shopName}" submitted successfully!`);
-                if (onComplete) {
-                  onComplete();
-                } else {
-                  onBack();
+              disabled={!step6Confirmed || !policyConfirmed || submittingApp}
+              onClick={async () => {
+                setSubmittingApp(true);
+                setSubmitError(null);
+                try {
+                  await submitShopApplication(supabase!, {
+                    ownerEmail: email,
+                    ownerPhone: mobileNumber,
+                    shopName,
+                    city: cityName,
+                    locality: localityName,
+                    fullAddress: fullAddress,
+                    openingTime,
+                    closingTime,
+                    aboutShop: '',
+                    websiteTemplate: 'classic',
+                  });
+                  if (onComplete) {
+                    onComplete();
+                  } else {
+                    onBack();
+                  }
+                } catch (err: any) {
+                  setSubmitError(err?.message || 'Submission failed. Please try again.');
+                } finally {
+                  setSubmittingApp(false);
                 }
               }}
               className={`flex-1 h-12 font-bold text-base rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg ${
@@ -3955,12 +3978,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   : "bg-gray-200 text-gray-400 cursor-not-allowed opacity-60"
               }`}
             >
-              Submit & Onboard
+              {submittingApp ? 'Submitting…' : 'Submit & Onboard'}
               <CheckCircle2 size={20} />
             </button>
           )}
         </div>
       </div>
+
+      {submitError && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[110] w-[calc(100%-2rem)] max-w-md bg-red-50 border border-red-200 text-red-900 text-xs font-semibold p-4 rounded-2xl shadow-2xl">
+          Submission blocked by the server: {submitError}
+        </div>
+      )}
 
       {/* Toast alerts. Rendered as a fixed overlay: it used to live inside the
           Step 5 markup, so a message triggered from the sticky footer appeared
@@ -4467,7 +4496,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-white">{shopName || 'Glow Beauty Parlour'}</h3>
+                    <h3 className="font-bold text-sm text-white">{shopName || 'Your salon'}</h3>
                     {isPublished ? (
                       <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -4591,7 +4620,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
                       <div>
                         <div className="flex items-center gap-2">
-                          <h1 className="text-xl font-extrabold text-white">{shopName || 'Glow Beauty Parlour'}</h1>
+                          <h1 className="text-xl font-extrabold text-white">{shopName || 'Your salon'}</h1>
                           <span className="material-symbols-outlined text-primary text-[18px]" title="Verified Merchant">verified</span>
                         </div>
                         <p className="text-xs text-gray-300 mt-1 flex items-center gap-1">
@@ -4863,7 +4892,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
                   {/* Website Footer */}
                   <div className="p-4 bg-gray-900 text-center text-white text-[11px] border-t border-gray-800">
-                    <p className="font-semibold">{shopName || 'Glow Beauty Parlour'} © 2026</p>
+                    <p className="font-semibold">{shopName || 'Your salon'} © 2026</p>
                     <p className="text-gray-400 text-[10px] mt-0.5">Powered by Local Merchant Digital Engine</p>
                   </div>
                 </div>
