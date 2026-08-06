@@ -25,6 +25,9 @@ export interface GpAttribution {
   salon_name?: string;
   salon_city?: string;
   salon_area?: string;
+  /** Geo coordinates for client-side Haversine distance (nearest-first sort). */
+  salon_latitude?: number | null;
+  salon_longitude?: number | null;
 }
 
 export interface CommissionSummary {
@@ -134,7 +137,7 @@ export async function fetchMyAttributions(
     try {
       const { data: salons } = await client
         .from('salons')
-        .select('id, name, city, area')
+        .select('id, name, city, area, latitude, longitude')
         .in('id', salonIds);
       const byId = new Map((salons ?? []).map((s: any) => [s.id, s]));
       for (const row of rows) {
@@ -143,6 +146,8 @@ export async function fetchMyAttributions(
           row.salon_name = salon.name;
           row.salon_city = salon.city;
           row.salon_area = salon.area;
+          row.salon_latitude = typeof salon.latitude === 'number' ? salon.latitude : null;
+          row.salon_longitude = typeof salon.longitude === 'number' ? salon.longitude : null;
         }
       }
     } catch {
