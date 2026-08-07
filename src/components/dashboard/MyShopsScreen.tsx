@@ -33,6 +33,8 @@ import {
 import BottomNav from './BottomNav';
 import { supabase } from '../../lib/supabaseClient';
 import { resolveGrowthPartner, fetchMyAttributions } from '../../lib/gpRepository';
+import { useAccurateLocation } from '../../hooks/useAccurateLocation';
+import { haversineMeters, formatDistance } from '../../utils/geo';
 
 interface Shop {
   id: string;
@@ -52,6 +54,10 @@ interface Shop {
   issueType?: string;
   submittedDate?: string;
   area: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Haversine distance from the user's accepted GPS fix (set when locked). */
+  distanceM?: number | null;
   ownerName: string;
   mobile: string;
   earnings?: number;
@@ -128,6 +134,8 @@ export default function MyShopsScreen({
           displayStatus: String(a.status),
           type: 'Salon',
           area: a.salon_area ?? '',
+          latitude: a.salon_latitude ?? null,
+          longitude: a.salon_longitude ?? null,
           ownerName: '',
           mobile: '',
           earnings: 0,
@@ -220,6 +228,28 @@ export default function MyShopsScreen({
 
     return result;
   }, [shops, activeTab, selectedArea, searchQuery, selectedSort]);
+
+  // ---- Accurate location → nearest-first sort (requirements #8–#11) --------
+  // watchPosition with enableHighAccuracy; fix accepted only at <=30 m; the
+  // list re-sorts only when the user moves >100 m (engine handles both).
+  const geo = useAccurateLocation();
+  useEffect(() => {
+    geo.start();
+    return () => geo.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const visibleShops = useMemo(() => {
+    if (!geo.fix) return filteredShops;
+    const origin = { latitude: geo.fix.latitude, longitude: geo.fix.longitude };
+    return [...filteredShops]
+      .map((s) =>
+        s.latitude != null && s.longitude != null
+          ? { ...s, distanceM: haversineMeters(origin, { latitude: s.latitude, longitude: s.longitude }) }
+          : { ...s, distanceM: null },
+      )
+      .sort((a, b) => (a.distanceM ?? Number.POSITIVE_INFINITY) - (b.distanceM ?? Number.POSITIVE_INFINITY));
+  }, [filteredShops, geo.fix]);
 
   // Handle Bottom Sheet filters apply
   const handleApplyFilters = () => {
@@ -623,7 +653,21 @@ export default function MyShopsScreen({
 
         {/* Shop Cards List */}
         <div className="flex flex-col gap-4">
-          {filteredShops.length === 0 ? (
+          {/* Location states — requirement #11 exact denied message, plus a
+              quiet "nearest first" indicator once the accurate fix locks. */}
+          {geo.status === 'denied' && (
+            <div className="mb-3 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-2xl text-[11px] font-semibold flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+              Please enable location to see nearby salons.
+            </div>
+          )}
+          {geo.status === 'locked' && geo.fix && (
+            <div className="mb-3 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl text-[11px] font-semibold flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              Sorted by nearest first · GPS ±{Math.round(geo.fix.accuracy)} m
+            </div>
+          )}
+          {visibleShops.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -678,7 +722,7 @@ export default function MyShopsScreen({
             </motion.div>
           ) : (
             <AnimatePresence mode="popLayout">
-            {filteredShops.map((shop) => {
+            {visibleShops.map((shop) => {
               const isShopSelected = selectedShopIds.includes(shop.id);
 
               // Decide border and accent coloring based on status
@@ -768,6 +812,9 @@ export default function MyShopsScreen({
                         </div>
                         <span className="text-[10px] font-semibold text-gray-400 block tracking-wider">
                           {shop.code} • {shop.area}
+                          {shop.distanceM != null && (
+                            <span className="text-emerald-600 font-bold"> • {formatDistance(shop.distanceM)}</span>
+                          )}
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 shrink-0 ml-1">

@@ -4,6 +4,8 @@ import MapPreview from './MapPreview';
 import CancellationPolicyModal from './CancellationPolicyModal';
 import { supabase } from '../lib/supabaseClient';
 import { submitShopApplication } from '../lib/gpRepository';
+import { useAccurateLocation } from '../hooks/useAccurateLocation';
+import type { GeoReading } from '../lib/locationService';
 import { 
   ArrowLeft, 
   User, 
@@ -168,6 +170,24 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [shopCategory, setShopCategory] = useState(() => draft.shopCategory ?? '');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(false);
+
+  // REAL GPS capture (navigator.geolocation watchPosition, accuracy-gated).
+  // Replaces the old fake: setTimeout + hardcoded "Mansarovar, Jaipur" address.
+  const geo = useAccurateLocation();
+  const [capturedLocation, setCapturedLocation] = useState<GeoReading | null>(
+    () => (draft as { capturedLocation?: GeoReading }).capturedLocation ?? null,
+  );
+  useEffect(() => {
+    if (geo.fix) {
+      // Saved per requirement: latitude, longitude, accuracy, timestamp.
+      setCapturedLocation(geo.fix);
+      setLocationDetected(true);
+      setIsDetectingLocation(false);
+    }
+  }, [geo.fix]);
+  useEffect(() => {
+    if (geo.error) setIsDetectingLocation(false);
+  }, [geo.error]);
   
   const [stateName, setStateName] = useState(() => draft.stateName ?? 'Rajasthan');
   const [districtName, setDistrictName] = useState(() => draft.districtName ?? 'Jaipur');
@@ -928,6 +948,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
         customLinks,
         panNumber,
         currentStep,
+        capturedLocation, // real GPS fix: { latitude, longitude, accuracy, timestamp }
         lastSaved: new Date().toISOString()
       };
       try {
@@ -995,6 +1016,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       customLinks,
       panNumber,
       currentStep,
+      capturedLocation, // real GPS fix: { latitude, longitude, accuracy, timestamp }
       lastSaved: new Date().toISOString()
     };
     try {
@@ -1008,17 +1030,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
   const handleDetectLocation = () => {
     setIsDetectingLocation(true);
-    setTimeout(() => {
-      setIsDetectingLocation(false);
-      setLocationDetected(true);
-      setStateName('Rajasthan');
-      setDistrictName('Jaipur');
-      setCityName('Jaipur');
-      setLocalityName('Mansarovar');
-      setFullAddress('72, Madhyam Marg, Mansarovar, Jaipur');
-      setPincode('302020');
-      setLandmark('Near Metro Station');
-    }, 1000);
+    // Start the real high-accuracy watch. First readings are NOT trusted:
+    // the fix is accepted only once accuracy <= 30 m (see lib/locationService).
+    geo.start();
   };
 
   // Live Camera API Handlers
@@ -1619,30 +1633,28 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   {isDetectingLocation ? "Detecting GPS Location..." : "Detect Current Location"}
                 </button>
 
-                {/* Detected Location Card */}
-                <div className="bg-[#F8F9FA] rounded-2xl p-3 border border-gray-200/80 flex items-center gap-3 shadow-2xs">
-                  <div className="w-14 h-14 rounded-xl bg-gray-200 overflow-hidden shrink-0 border border-gray-300/60 relative">
-                    <img 
-                      src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=150&q=80" 
-                      alt="Map Thumbnail" 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
-                      <MapPin size={18} className="text-primary fill-primary/30" />
+                {/* Detected Location Card — only after a REAL accepted fix */}
+                {locationDetected && capturedLocation && (
+                  <div className="bg-[#F8F9FA] rounded-2xl p-3 border border-gray-200/80 flex items-center gap-3 shadow-2xs">
+                    <div className="w-14 h-14 rounded-xl bg-emerald-50 overflow-hidden shrink-0 border border-emerald-100 relative flex items-center justify-center">
+                      <MapPin size={22} className="text-emerald-600 fill-emerald-200" />
+                    </div>
+                    <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
+                      <div>
+                        <p className="text-xs font-bold text-gray-900 line-clamp-1">
+                          {capturedLocation.latitude.toFixed(6)}, {capturedLocation.longitude.toFixed(6)}
+                        </p>
+                        <p className="text-[11px] text-gray-500 font-medium">
+                          GPS accuracy ±{Math.round(capturedLocation.accuracy)}m ·{' '}
+                          {new Date(capturedLocation.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <span className="bg-[#E6F8EE] text-[#00A859] border border-[#B3EED0] px-3 py-1 rounded-full text-[11px] font-bold shrink-0">
+                        Location Added
+                      </span>
                     </div>
                   </div>
-                  <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 line-clamp-1">
-                        Detected: {localityName || "Mansarovar"}, {cityName || "Jaipur"}, {stateName || "Rajasthan"}
-                      </p>
-                      <p className="text-[11px] text-gray-500 font-medium">GPS accuracy ±5m</p>
-                    </div>
-                    <span className="bg-[#E6F8EE] text-[#00A859] border border-[#B3EED0] px-3 py-1 rounded-full text-[11px] font-bold shrink-0">
-                      Location Added
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Live Interactive Map Preview Component */}
@@ -1655,7 +1667,11 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                   pincode={pincode}
                   landmark={landmark}
                   onDetectLocation={handleDetectLocation}
-                  isDetecting={isDetectingLocation}
+                  isDetecting={isDetectingLocation && !capturedLocation}
+                  accurateFix={geo.fix ?? capturedLocation}
+                  waitingReading={geo.lastReading}
+                  locationError={geo.error}
+                  permissionStatus={geo.permissionStatus}
                 />
               </div>
 
