@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { detectBrowserAndOS, InstallHelpTab, DeviceBrowserInfo } from '../utils/browserDetection';
 import { copyToClipboard } from '../utils/clipboard';
+import { getPwaInstallState, subscribePwaInstall, triggerPwaInstall } from '../utils/pwaInstall';
 
 interface InstallAppModalProps {
   isOpen: boolean;
@@ -33,52 +34,42 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
   const [helpTab, setHelpTab] = useState<InstallHelpTab>(() => deviceInfo.recommendedHelpTab);
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [pwaState, setPwaState] = useState(getPwaInstallState);
   const [installSuccess, setInstallSuccess] = useState(false);
 
-  // Listen for the PWA install prompt. Registered once for the lifetime of the
-  // component (not per `isOpen` change) so the event isn't missed while closed.
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+  // beforeinstallprompt is captured GLOBALLY (src/utils/pwaInstall, started in
+  // main.tsx before first render) because the one-shot event usually fires on
+  // the login screen — long before this modal mounts on the dashboard.
+  // Listening only here meant the event was already gone, `deferredPrompt`
+  // stayed null and the install button silently degraded into a Share sheet.
+  useEffect(() => subscribePwaInstall(() => setPwaState(getPwaInstallState())), []);
 
-    const handleAppInstalled = () => {
-      setDeferredPrompt(null);
-      setInstallSuccess(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
+  const isIos = deviceInfo.os === 'ios';
 
   const handleTriggerInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallSuccess(true);
-        setTimeout(() => setInstallSuccess(false), 4000);
-      }
-      setDeferredPrompt(null);
-    } else if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Nexora Partner App',
-          text: 'Install the Nexora Growth Partner App for daily shop commission tracking!',
-          url: window.location.origin
-        });
-      } catch {
-        // User cancelled share
-      }
-    } else {
+    const outcome = await triggerPwaInstall();
+    if (outcome === 'accepted') {
+      setInstallSuccess(true);
+      setTimeout(() => setInstallSuccess(false), 4000);
+      setPwaState(getPwaInstallState());
+    }
+  };
+
+  // Share is a utility action, NOT an install path — it must never masquerade
+  // as the install button's fallback.
+  const handleShareApp = async () => {
+    if (!('share' in navigator)) {
       handleCopyLink();
+      return;
+    }
+    try {
+      await navigator.share({
+        title: 'Nexora Partner App',
+        text: 'Install the Nexora Growth Partner App for daily shop commission tracking!',
+        url: window.location.origin
+      });
+    } catch {
+      // User cancelled share
     }
   };
 
@@ -423,31 +414,58 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
           </div>
 
           {/* Action Buttons Footer */}
-          <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={handleTriggerInstall}
-              className="flex-1 bg-primary hover:bg-[#a00056] text-white h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pink-200/50 active:scale-95 transition-all cursor-pointer"
-            >
-              <Download size={16} />
-              <span>{deferredPrompt ? 'Install App Now' : 'Prompt Installation'}</span>
-            </button>
+          <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 space-y-2">
+            {pwaState.installed ? (
+              <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                <span>Nexora installed — check your home screen!</span>
+              </div>
+            ) : pwaState.canPrompt ? (
+              <button
+                onClick={handleTriggerInstall}
+                className="w-full bg-primary hover:bg-[#a00056] text-white h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pink-200/50 active:scale-95 transition-all cursor-pointer"
+              >
+                <Download size={16} />
+                <span>Install App Now</span>
+              </button>
+            ) : (
+              <div className="w-full bg-amber-50 border border-amber-200 text-amber-900 px-4 py-2.5 rounded-2xl text-[11px] font-semibold leading-relaxed flex items-start gap-2">
+                <Smartphone size={15} className="shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  {isIos
+                    ? 'iPhone/iPad pe automatic install prompt nahi hota — upar diye steps follow karke Share → "Add to Home Screen" se install karein.'
+                    : 'Is browser me install ka button address bar ya upar diye menu steps me milta hai — guide follow karein.'}
+                </span>
+              </div>
+            )}
 
-            <button
-              onClick={handleCopyLink}
-              className="bg-white hover:bg-gray-100 text-gray-800 border border-gray-200 h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer shrink-0"
-            >
-              {copiedLink ? (
-                <>
-                  <Check size={15} className="text-emerald-600" />
-                  <span className="text-emerald-700">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={15} className="text-gray-600" />
-                  <span>Copy App Link</span>
-                </>
+            <div className="flex gap-2">
+              {'share' in navigator && !pwaState.installed && (
+                <button
+                  onClick={handleShareApp}
+                  className="flex-1 bg-white hover:bg-gray-100 text-gray-800 border border-gray-200 h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Share2 size={15} className="text-gray-600" />
+                  <span>Share App</span>
+                </button>
               )}
-            </button>
+              <button
+                onClick={handleCopyLink}
+                className="flex-1 bg-white hover:bg-gray-100 text-gray-800 border border-gray-200 h-11 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check size={15} className="text-emerald-600" />
+                    <span className="text-emerald-700">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={15} className="text-gray-600" />
+                    <span>Copy App Link</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

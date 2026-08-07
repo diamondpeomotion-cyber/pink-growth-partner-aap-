@@ -2,12 +2,18 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import {initPwaInstallCapture} from './utils/pwaInstall';
 
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
   throw new Error('Root container #root was not found in index.html');
 }
+
+// Capture beforeinstallprompt GLOBALLY before the first render. The event
+// fires once — usually while the login screen is showing — and would be lost
+// by the time the Install App modal mounts on the dashboard.
+initPwaInstallCapture();
 
 createRoot(rootElement).render(
   <StrictMode>
