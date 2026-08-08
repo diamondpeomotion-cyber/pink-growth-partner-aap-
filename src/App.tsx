@@ -8,8 +8,9 @@ import TicketDetailsScreen from './components/dashboard/TicketDetailsScreen';
 import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import OfflineNotificationBanner from './components/OfflineNotificationBanner';
-import { supabase, supabaseConfigError } from './lib/supabaseClient';
+import { supabase, supabaseConfigError, initialRecoveryLink } from './lib/supabaseClient';
 import { checkGrowthPartnerAccess } from './lib/gpRepository';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 // Heavy route-level screens are code-split so the initial bundle only carries
 // the login + dashboard path instead of every screen in the app.
@@ -98,6 +99,19 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const authVerifySeq = useRef(0);
 
+  // ---- Password recovery (Phase 3) ----
+  // 'pending'  = a recovery link was opened, waiting for Supabase to verify it
+  // 'active'   = Supabase accepted the recovery token (PASSWORD_RECOVERY)
+  // 'invalid'  = link expired/used/revoked (or carried an error) — no reset
+  type RecoveryState = 'none' | 'pending' | 'active' | 'invalid';
+  const [recovery, setRecovery] = useState<RecoveryState>('none');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const recoveryRef = useRef<RecoveryState>('none');
+  const setRecoveryBoth = (v: RecoveryState) => {
+    recoveryRef.current = v;
+    setRecovery(v);
+  };
+
   useEffect(() => {
     if (!supabase) {
       setAuthReady(true);
@@ -106,7 +120,22 @@ export default function App() {
     const client = supabase;
     let cancelled = false;
 
+    // Recovery-link state was captured synchronously at module load (before
+    // supabase-js consumed/stripped the URL hash) — see lib/supabaseClient.
+    if (initialRecoveryLink.error) {
+      setRecoveryError(initialRecoveryLink.error);
+      setRecoveryBoth('invalid');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (initialRecoveryLink.intent) {
+      setRecoveryBoth('pending');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     const applySession = async (session: import('@supabase/supabase-js').Session | null) => {
+      // Recovery flow owns the screen while it is pending/active — never run
+      // the role gate against a recovery session (a Customer must also be
+      // able to finish resetting THEIR password; the gate resumes at login).
+      if (recoveryRef.current === 'pending' || recoveryRef.current === 'active') return;
       const seq = ++authVerifySeq.current;
       if (!session?.user) {
         if (!cancelled) {
@@ -140,12 +169,25 @@ export default function App() {
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (!cancelled) void applySession(data.session);
+        if (cancelled) return;
+        // Race fix: PASSWORD_RECOVERY may have fired before React subscribed
+        // (supabase-js processes the hash at client creation). If a recovery
+        // link is pending and a session already exists, it IS the recovery
+        // session — unlock the form.
+        if (recoveryRef.current === 'pending' && data.session) {
+          setRecoveryBoth('active');
+          return;
+        }
+        void applySession(data.session);
       })
       .catch(() => {
         if (!cancelled) setAuthReady(true);
       });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setRecoveryBoth('active');
+        return;
+      }
       void applySession(session);
     });
     return () => {
@@ -262,6 +304,30 @@ export default function App() {
           <p className="text-sm leading-6 text-gray-600">{supabaseConfigError}</p>
         </div>
       </div>
+    );
+  }
+
+  // Password-recovery surface takes over the whole app while a reset link is
+  // being verified or used. After completion/cancel the (now-stale) recovery
+  // session is destroyed and the normal login gate resumes.
+  if (recovery === 'pending' || recovery === 'active' || recovery === 'invalid') {
+    const endRecovery = () => {
+      if (supabase) {
+        void supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+        void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      }
+      setRecoveryBoth('none');
+      setRecoveryError(null);
+      setIsLoggedIn(false);
+      setAuthReady(true);
+    };
+    return (
+      <ResetPasswordScreen
+        verifying={recovery === 'pending'}
+        initialError={recovery === 'invalid' ? recoveryError : null}
+        onCompleted={endRecovery}
+        onExit={endRecovery}
+      />
     );
   }
 
