@@ -100,5 +100,35 @@ const config = validateSupabaseConfig(
   viteEnv?.VITE_SUPABASE_ANON_KEY,
 );
 
+/**
+ * Password-recovery link detection — captured SYNCHRONOUSLY at module load,
+ * BEFORE createClient() starts its async hash consumption. Reading the URL
+ * later (e.g. inside a React effect) races with supabase-js, which may have
+ * already stripped the hash → the app would miss expired-link errors.
+ */
+export const initialRecoveryLink: { intent: boolean; error: string | null } = (() => {
+  if (typeof window === 'undefined' || !window.location.hash.startsWith('#')) {
+    return { intent: false, error: null };
+  }
+  const hp = new URLSearchParams(window.location.hash.slice(1));
+  const err = hp.get('error_description') ?? hp.get('error');
+  if (err) {
+    return {
+      intent: true,
+      error: 'This reset link is invalid, expired or was already used. Request a fresh one below.',
+    };
+  }
+  if (hp.get('type') === 'recovery') return { intent: true, error: null };
+  return { intent: false, error: null };
+})();
+
 export const supabaseConfigError = config.isValid ? null : config.error;
-export const supabase = config.isValid ? createClient(config.url, config.anonKey) : null;
+// flowType 'implicit' is REQUIRED for email recovery links: the emailed
+// verify-URL lands tokens in the URL hash (#access_token=...&type=recovery),
+// which a PKCE-mode client rejects ("Not a valid PKCE flow url") because the
+// code verifier only exists in the browser that requested the reset — and
+// users routinely open recovery emails in a DIFFERENT browser/app webview.
+// Password sign-in (grant) is unaffected by this setting.
+export const supabase = config.isValid
+  ? createClient(config.url, config.anonKey, { auth: { flowType: 'implicit' } })
+  : null;

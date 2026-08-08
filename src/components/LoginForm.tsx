@@ -312,15 +312,35 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     setIsForgotOpen(true);
   };
 
-  const handleSendResetLink = (e: React.FormEvent) => {
+  const handleSendResetLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail.trim()) {
-      setResetError('Please enter your registered email address or mobile number.');
+    const target = resetEmail.trim().toLowerCase();
+    if (!target) {
+      setResetError('Please enter your registered email address.');
+      return;
+    }
+    if (!isValidEmail(target)) {
+      setResetError('Password reset works with your registered email address (not mobile).');
+      return;
+    }
+    if (!supabase) {
+      setResetError(supabaseConfigError || 'Supabase is not configured.');
       return;
     }
     setResetError('');
     setResetStatus('sending');
-    setTimeout(() => setResetStatus('sent'), 1200);
+    // Real Supabase Auth recovery. The API deliberately answers identically
+    // for registered and unregistered emails (anti-enumeration), so the UI
+    // always shows the same neutral confirmation.
+    const { error } = await supabase.auth.resetPasswordForEmail(target, {
+      redirectTo: `${window.location.origin}/`,
+    });
+    if (error) {
+      setResetStatus('idle');
+      setResetError(`Could not send the reset link: ${error.message}`);
+      return;
+    }
+    setResetStatus('sent');
   };
 
   const fieldWrap = (hasError?: string) =>
@@ -684,6 +704,7 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
           <div className="bg-white rounded-[24px] p-6 w-full max-w-sm shadow-2xl border border-gray-100 relative text-left animate-in fade-in zoom-in-95 duration-200">
             <button
               type="button"
+              aria-label="Close"
               onClick={() => setIsForgotOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
             >
@@ -695,10 +716,11 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                 <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
                   <CheckCircle2 size={32} />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">Reset Link Sent!</h3>
+                <h3 className="text-lg font-bold text-gray-900">Check Your Email</h3>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  We have sent a password reset link to <strong className="text-gray-900">{resetEmail}</strong>.
-                  Please check your email inbox and spam folder.
+                  If <strong className="text-gray-900">{resetEmail}</strong> is registered with Nexora,
+                  a password reset link has been sent to it. Please check your inbox and spam folder —
+                  the link works only once and expires soon.
                 </p>
                 <button
                   type="button"
@@ -721,19 +743,19 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
                 </div>
 
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Enter your registered email address or 10-digit mobile number, and we will send you a link to
-                  reset your password.
+                  Enter your registered email address and Supabase will send you a secure, one-time
+                  link to reset your password.
                 </p>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600 ml-1">Email or Mobile Number</label>
+                  <label className="text-xs font-semibold text-gray-600 ml-1">Registered Email</label>
                   <div className="flex items-center bg-[#f0edec] rounded-xl h-12 px-3.5 border border-transparent focus-within:border-[#b90064] transition-all">
-                    <User className="text-gray-500 mr-2 shrink-0" size={18} />
+                    <Mail className="text-gray-500 mr-2 shrink-0" size={18} />
                     <input
-                      type="text"
+                      type="email"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="e.g. rajesh@example.com or 9832145678"
+                      placeholder="e.g. rajesh@example.com"
                       className="bg-transparent border-none outline-none w-full text-xs text-gray-900 placeholder:text-gray-400 font-medium"
                     />
                   </div>
