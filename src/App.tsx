@@ -9,6 +9,7 @@ import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import OfflineNotificationBanner from './components/OfflineNotificationBanner';
 import { supabase, supabaseConfigError } from './lib/supabaseClient';
+import { checkGrowthPartnerAccess } from './lib/gpRepository';
 
 // Heavy route-level screens are code-split so the initial bundle only carries
 // the login + dashboard path instead of every screen in the app.
@@ -90,29 +91,58 @@ export default function App() {
   const swipeRef = useRef<HTMLDivElement>(null);
 
   // Real Supabase session drives the auth state (replaces the fake
-  // localStorage 'isAuthenticated' flag).
+  // localStorage 'isAuthenticated' flag). Authentication alone is NOT access:
+  // every session (fresh or restored) is authorized against the permanent
+  // role stored in the database — never localStorage, URL or app state.
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const authVerifySeq = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
       setAuthReady(true);
       return;
     }
+    const client = supabase;
     let cancelled = false;
+
+    const applySession = async (session: import('@supabase/supabase-js').Session | null) => {
+      const seq = ++authVerifySeq.current;
+      if (!session?.user) {
+        if (!cancelled) {
+          setIsLoggedIn(false);
+          setAuthReady(true);
+        }
+        return;
+      }
+      const check = await checkGrowthPartnerAccess(client, session.user.id);
+      if (cancelled || seq !== authVerifySeq.current) return;
+      if (check.state === 'denied') {
+        // Authenticated but not authorized for this app (e.g. a Customer
+        // account) — kill the session so no surface is reachable.
+        await client.auth.signOut().catch(() => {});
+        if (!cancelled) {
+          setIsLoggedIn(false);
+          setAuthReady(true);
+        }
+        return;
+      }
+      // 'authorized' → enter. 'unknown' (offline/transient failure) → keep
+      // the session: RLS still enforces every query server-side.
+      setIsLoggedIn(true);
+      setAuthReady(true);
+    };
+
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (!cancelled) {
-          setIsLoggedIn(Boolean(data.session));
-          setAuthReady(true);
-        }
+        if (!cancelled) void applySession(data.session);
       })
       .catch(() => {
         if (!cancelled) setAuthReady(true);
       });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(Boolean(session));
+      void applySession(session);
     });
     return () => {
       cancelled = true;

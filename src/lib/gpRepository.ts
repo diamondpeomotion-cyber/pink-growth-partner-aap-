@@ -79,7 +79,8 @@ export async function resolveGrowthPartner(
 /**
  * Role guard: only permanent growth partners may use this app. Checks
  * user_roles first, then profiles.platform_role (district_partner is the
- * legacy label for the same role).
+ * legacy label for the same role). The role always comes from the database —
+ * never from localStorage, URL params or frontend state.
  */
 export async function isGrowthPartnerRole(
   client: SupabaseClient,
@@ -97,6 +98,9 @@ export async function isGrowthPartnerRole(
       if (match) return { allowed: true, foundRole: match };
       return { allowed: false, foundRole: roles[0] ?? null };
     }
+    // Query succeeded but user has no roles at all → definitively a
+    // non-partner account (e.g. plain customer), do not fall through.
+    if (!error) return { allowed: false, foundRole: null };
   } catch {
     // fall through to profiles check
   }
@@ -114,6 +118,66 @@ export async function isGrowthPartnerRole(
     // no role source available
   }
   return { allowed: false, foundRole: null };
+}
+
+export type PartnerAccessState = 'authorized' | 'denied' | 'unknown';
+
+/**
+ * Tri-state access check for session restore. 'denied' is returned only when
+ * the database DEFINITIVELY answered (role exists and is not a partner role,
+ * or the account has a profile whose role is not a partner role). Network or
+ * transient failures return 'unknown' so the offline-first shell can keep the
+ * signed-in session alive — RLS still enforces access server-side.
+ */
+export async function checkGrowthPartnerAccess(
+  client: SupabaseClient,
+  userId: string,
+): Promise<{ state: PartnerAccessState; foundRole: string | null }> {
+  const GP_ROLES = new Set(['growth_partner', 'district_partner']);
+  let profileLookedUp = false;
+  try {
+    const { data, error } = await client
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const roles = data.map((r: any) => String(r.role));
+      const match = roles.find((r) => GP_ROLES.has(r));
+      if (match) return { state: 'authorized', foundRole: match };
+      return { state: 'denied', foundRole: roles[0] ?? null };
+    }
+    if (error) {
+      // Could not read the view (offline / transient) — cannot decide.
+      return { state: 'unknown', foundRole: null };
+    }
+    // View answered with zero rows. The view maps one row per profile, so a
+    // definitive "no roles" only holds once we know whether a profile exists.
+    profileLookedUp = true;
+  } catch {
+    return { state: 'unknown', foundRole: null };
+  }
+  if (profileLookedUp) {
+    try {
+      const { data, error } = await client
+        .from('profiles')
+        .select('platform_role')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) return { state: 'unknown', foundRole: null };
+      if (data?.platform_role) {
+        const role = String(data.platform_role);
+        return GP_ROLES.has(role)
+          ? { state: 'authorized', foundRole: role }
+          : { state: 'denied', foundRole: role };
+      }
+      // Profile exists but role column empty → treat as denied (unprovisioned
+      // accounts must not get application access).
+      return { state: 'denied', foundRole: null };
+    } catch {
+      return { state: 'unknown', foundRole: null };
+    }
+  }
+  return { state: 'unknown', foundRole: null };
 }
 
 /** Shops attributed to this partner (active attributions + salon basics). */
