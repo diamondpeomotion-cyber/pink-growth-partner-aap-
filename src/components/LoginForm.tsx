@@ -163,7 +163,8 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
       // Permanent-role guard: only Growth Partners may enter this app.
       const roleCheck = await isGrowthPartnerRole(supabase, userId);
       if (!roleCheck.allowed) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
         setErrors({
           username: '',
           password: roleCheck.foundRole
@@ -237,7 +238,8 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
         return;
       }
       // Real account in the shared Nexora project. The Growth Partner role is
-      // assigned by Nexora ops (permanent roles are locked server-side).
+      // assigned by Nexora ops (permanent roles are locked server-side) — the
+      // frontend must NEVER claim a role in signup metadata.
       const { data, error } = await supabase.auth.signUp({
         email,
         password: suPassword,
@@ -247,7 +249,6 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
             mobile,
             city,
             partner_code: buildAgentCode(city),
-            signup_role: 'growth_partner',
           },
         },
       });
@@ -272,6 +273,27 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
         setSuSubmitting(false);
         switchMode('login');
         return;
+      }
+
+      // Signup success ≠ application access. A fresh account is always a
+      // plain customer until Nexora ops assigns the permanent Growth Partner
+      // role, so run the same authorization gate as login before entering.
+      const signupUserId = data.user?.id;
+      if (signupUserId) {
+        const roleCheck = await isGrowthPartnerRole(supabase, signupUserId);
+        if (!roleCheck.allowed) {
+          await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+          setSuSubmitting(false);
+          switchMode('login');
+          setMessage({
+            type: 'success',
+            text:
+              'Account created! Your Growth Partner role is assigned by Nexora ops after verification. ' +
+              'You can sign in to this app once your role is activated — until then the Customer app works with this account.',
+          });
+          return;
+        }
       }
 
       setSuSubmitting(false);
