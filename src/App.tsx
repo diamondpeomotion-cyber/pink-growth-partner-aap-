@@ -119,8 +119,12 @@ export default function App() {
       if (cancelled || seq !== authVerifySeq.current) return;
       if (check.state === 'denied') {
         // Authenticated but not authorized for this app (e.g. a Customer
-        // account) — kill the session so no surface is reachable.
-        await client.auth.signOut().catch(() => {});
+        // account) — kill the session so no surface is reachable. Global
+        // revoke first (hygiene), then a guaranteed LOCAL wipe: a stale
+        // token must never survive this gate, even when the server-side
+        // session family is already dead and the logout API returns 403.
+        await client.auth.signOut({ scope: 'global' }).catch(() => {});
+        await client.auth.signOut({ scope: 'local' }).catch(() => {});
         if (!cancelled) {
           setIsLoggedIn(false);
           setAuthReady(true);

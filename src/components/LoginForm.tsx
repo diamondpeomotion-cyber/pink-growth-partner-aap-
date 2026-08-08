@@ -163,7 +163,8 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
       // Permanent-role guard: only Growth Partners may enter this app.
       const roleCheck = await isGrowthPartnerRole(supabase, userId);
       if (!roleCheck.allowed) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
         setErrors({
           username: '',
           password: roleCheck.foundRole
@@ -281,7 +282,8 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
       if (signupUserId) {
         const roleCheck = await isGrowthPartnerRole(supabase, signupUserId);
         if (!roleCheck.allowed) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
           setSuSubmitting(false);
           switchMode('login');
           setMessage({
