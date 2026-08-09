@@ -3974,14 +3974,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
                     fullAddress: fullAddress,
                     openingTime,
                     closingTime,
-                    aboutShop: '',
-                    websiteTemplate: 'classic',
+                    aboutShop: aboutShop || '',
+                    websiteTemplate: selectedTemplate || 'modern-salon',
+                    services: services,
                   });
-                  if (onComplete) {
-                    onComplete();
-                  } else {
-                    onBack();
-                  }
+                  triggerDocToast('success', 'Proposal Submitted', 'Website sent to Shop Owner for approval.');
+                  setTimeout(() => {
+                    if (onComplete) {
+                      onComplete();
+                    } else {
+                      onBack();
+                    }
+                  }, 1200);
                 } catch (err: any) {
                   setSubmitError(err?.message || 'Submission failed. Please try again.');
                 } finally {
