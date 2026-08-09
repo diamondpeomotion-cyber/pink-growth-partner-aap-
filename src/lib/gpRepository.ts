@@ -422,13 +422,14 @@ export interface ShopApplicationInput {
   closingTime: string;
   aboutShop: string;
   websiteTemplate: string;
+  existingSalonId?: string | null;
+  services?: Array<{ name: string; price: string; duration: string }>;
 }
 
 /**
  * Submit a new shop application + website-setup proposal. Contract mirrors the
- * proven dashboard flow (save_growth_partner_salon_setup RPC). The live
- * server currently REJECTS the application insert via RLS (42501) — the error
- * is surfaced to the UI so nothing is silently faked.
+ * proven dashboard flow (save_growth_partner_salon_setup RPC).
+ * The RPC resolves canonical salon, owner membership, and organization server-side.
  */
 export async function submitShopApplication(
   client: SupabaseClient,
@@ -455,11 +456,12 @@ export async function submitShopApplication(
     partner = { id: newPartner.id, user_id: user.id };
   }
 
-  // 2. Create the onboarding application (server RLS decides).
+  // 2. Create the onboarding application with server-side canonical linkage
   const { data: app, error: appErr } = await client
     .from('shop_onboarding_applications')
     .insert({
       submitted_by_partner_id: partner.id,
+      existing_salon_id: input.existingSalonId || null,
       status: 'draft',
       current_step: 6,
       owner_email: input.ownerEmail.trim().toLowerCase(),
@@ -477,7 +479,7 @@ export async function submitShopApplication(
     .single();
   if (appErr) throw appErr;
 
-  // 3. Save the website-setup proposal payload.
+  // 3. Save the website-setup proposal payload (validated & owner-resolved server-side)
   const payload = {
     profile: {
       name: input.shopName.trim(),
@@ -489,7 +491,7 @@ export async function submitShopApplication(
       city: input.city.trim(),
       opening_hours: { opens: input.openingTime, closes: input.closingTime },
     },
-    services: [],
+    services: input.services || [],
     template: { key: input.websiteTemplate },
   };
   const { error: proposalErr } = await client.rpc('save_growth_partner_salon_setup', {
@@ -500,4 +502,39 @@ export async function submitShopApplication(
   if (proposalErr) throw proposalErr;
 
   return { applicationId: String(app.id) };
+}
+
+export interface SaveProposalInput {
+  applicationId: string;
+  payload: Record<string, unknown>;
+  isSubmit: boolean; // false = draft, true = submit for owner approval
+}
+
+/**
+ * Save Growth Partner salon setup proposal:
+ * - isSubmit = false -> status 'draft' (canonical draft persisted in salon_setup_proposals)
+ * - isSubmit = true -> status 'submitted' (sent to Shop Owner, records version in salon_setup_proposal_versions)
+ * Note: Submitting does NOT make the salon public; owner must review & publish.
+ */
+export async function saveGrowthPartnerProposal(
+  client: SupabaseClient,
+  input: SaveProposalInput,
+): Promise<{ proposalId: string; status: 'draft' | 'submitted'; message: string }> {
+  const { data: proposalId, error } = await client.rpc('save_growth_partner_salon_setup', {
+    p_application_id: input.applicationId,
+    p_payload: input.payload,
+    p_submit: input.isSubmit,
+  });
+  if (error) throw error;
+
+  const status = input.isSubmit ? 'submitted' : 'draft';
+  const message = input.isSubmit
+    ? 'Website sent to Shop Owner for approval.'
+    : 'Website draft saved successfully in proposals.';
+
+  return {
+    proposalId: String(proposalId),
+    status,
+    message,
+  };
 }
