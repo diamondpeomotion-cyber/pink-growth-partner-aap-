@@ -13,7 +13,7 @@ export default function QuickActionsGrid({ onNavigate }: { onNavigate: (page: st
     { icon: Gift, label: 'Rewards', page: 'rewards' },
     { icon: Store, label: 'My Shops', page: 'shops' },
     { icon: DollarSign, label: 'Payouts', page: 'payouts' },
-    { icon: Globe, label: 'Website', page: 'website-settings' },
+    { icon: Globe, label: 'Website', page: 'website-onboarding' },
     { icon: User, label: 'Profile', page: 'profile' },
   ];
 

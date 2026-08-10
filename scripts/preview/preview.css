@@ -1,0 +1,5 @@
+/* Dev-preview stylesheet: reuses the real app theme and tells Tailwind v4 to
+   scan the application sources (the harness root is scripts/preview). */
+@import "../../src/index.css";
+@source "../../src";
+@source "./main.tsx";

@@ -17,7 +17,9 @@ import ResetPasswordScreen from './components/ResetPasswordScreen';
 const AddShop = lazy(() => import('./components/AddShop'));
 const MyShopsScreen = lazy(() => import('./components/dashboard/MyShopsScreen'));
 const ProfileScreen = lazy(() => import('./components/dashboard/ProfileScreen'));
-const WebsiteSettingsScreen = lazy(() => import('./components/dashboard/WebsiteSettingsScreen'));
+// White Label -> Website now points at the ported Website Onboarding flow
+// (replaces the retired WebsiteSettingsScreen / WebsitePreviewScreen mock).
+const WebsiteOnboardingScreen = lazy(() => import('./components/dashboard/WebsiteOnboardingScreen'));
 const RewardsScreen = lazy(() => import('./components/dashboard/RewardsScreen'));
 const ShopEarningsLedgerScreen = lazy(() => import('./components/dashboard/ShopEarningsLedgerScreen'));
 const RewardDetailsScreen = lazy(() => import('./components/dashboard/RewardDetailsScreen'));
@@ -27,7 +29,6 @@ const PayoutsScreen = lazy(() => import('./components/dashboard/PayoutsScreen'))
 const QREarningsScreen = lazy(() => import('./components/dashboard/QREarningsScreen'));
 const PayoutHistoryScreen = lazy(() => import('./components/dashboard/PayoutHistoryScreen'));
 const AccountSettingsScreen = lazy(() => import('./components/dashboard/AccountSettingsScreen'));
-const WebsitePreviewScreen = lazy(() => import('./components/dashboard/WebsitePreviewScreen'));
 const SupportScreen = lazy(() => import('./components/dashboard/SupportScreen'));
 
 /**
@@ -37,8 +38,7 @@ const SupportScreen = lazy(() => import('./components/dashboard/SupportScreen'))
  */
 const SCREENS_WITH_OWN_BACK_BUTTON = new Set([
   'add-shop',
-  'website-settings',
-  'website-preview',
+  'website-onboarding',
   'account-settings',
   'scan-qr',
   'support',
@@ -56,6 +56,12 @@ const SCREENS_WITH_OWN_BACK_BUTTON = new Set([
   'payout-history',
   'payouts',
 ]);
+
+/**
+ * Screens that own the whole viewport and scroll internally. They must not be
+ * nested inside the app's page scroller or they get a second scrollbar.
+ */
+const FULL_HEIGHT_SCREENS = new Set(['website-onboarding']);
 
 export const DEFAULT_PARTNER_PROFILE = {
   name: 'Rahul Verma',
@@ -356,16 +362,12 @@ export default function App() {
     if (currentPage === 'add-shop') {
       return <AddShop 
         onBack={goBack} 
-        onComplete={() => navigateTo('website-settings')} 
+        onComplete={() => navigateTo('website-onboarding')} 
       />;
     }
 
-    if (currentPage === 'website-settings') {
-      return <WebsiteSettingsScreen onBack={goBack} onNavigate={navigateTo} />;
-    }
-
-    if (currentPage === 'website-preview') {
-      return <WebsitePreviewScreen onBack={goBack} />;
+    if (currentPage === 'website-onboarding') {
+      return <WebsiteOnboardingScreen onBack={goBack} onNavigate={navigateTo} />;
     }
 
     if (currentPage === 'account-settings') {
@@ -495,6 +497,8 @@ export default function App() {
       }} />;
   };
 
+  const isFullHeightScreen = FULL_HEIGHT_SCREENS.has(currentPage);
+
   return (
     <div ref={swipeRef} className="h-screen max-h-screen w-full flex flex-col bg-[#fcf9f8] overflow-hidden">
       <OfflineNotificationBanner isOnline={isOnline} />
@@ -511,13 +515,23 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
-        <div className="min-h-full w-full shadow-lg bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
+      {/* The Website Onboarding wizard manages its own internal scrolling and
+          needs the full remaining height, so it bypasses the page scroller. */}
+      {isFullHeightScreen ? (
+        <div className="flex-1 min-h-0 w-full overflow-hidden">
           <Suspense fallback={<ScreenLoader />}>
             {renderContent()}
           </Suspense>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
+          <div className="min-h-full w-full shadow-lg bg-[#fcf9f8] relative flex flex-col overflow-x-hidden">
+            <Suspense fallback={<ScreenLoader />}>
+              {renderContent()}
+            </Suspense>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
