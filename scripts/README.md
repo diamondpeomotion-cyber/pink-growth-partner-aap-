@@ -4,10 +4,41 @@ Nothing in this folder is part of the application bundle: it lives outside
 `src/`, no application file imports it, and `npm run build` (root
 `vite.config.ts`, entry `index.html`) never sees it.
 
-Requires one extra dev dependency, installed without touching `package.json`:
+Dev dependencies used here (`jsdom`, `ws`) are declared in the root
+`package.json` as `devDependencies` and never affect the shipped bundle.
+
+## `verify-nexora-auth.ts` — Nexora auth architecture verification
+
+Offline assertions (no credentials required):
+
+- the locked auth config is EXACTLY the Nexora contract — storageKey
+  `nexora.auth.qwaehqsmodekbgvnaavz`, `persistSession`, `autoRefreshToken`,
+  `detectSessionInUrl`, `flowType: 'pkce'`;
+- `validateSupabaseConfig()` pins the project to `qwaehqsmodekbgvnaavz`,
+  rejects http/other projects/service-role/`sb_secret_` keys;
+- `src/lib/supabaseClient.ts` re-exports the SAME client as
+  `src/lib/supabase.ts` (no second auth system);
+- the `/auth/login` redirect helpers are idempotent and loop-free;
+- legacy-session storage migration is one-way and safe.
+
+With a real `.env` it extends to live checks against the shared project, and
+with `GP_TEST_EMAIL`/`GP_TEST_PASSWORD` it also runs sign-in → `getUser()` →
+sign-out → session-cleared against the live auth service.
 
 ```bash
-npm install --no-save jsdom
+npx tsx scripts/verify-nexora-auth.ts
+```
+
+## `verify-location-sync.ts` — location sync lifecycle verification
+
+Renders `src/hooks/useLocationSync.ts` in jsdom against an in-memory fake of
+supabase-js and a stubbed `navigator.geolocation`. Asserts the watcher runs
+only for authenticated sessions, is deduplicated to a single instance (even
+under StrictMode), pushes accepted fixes through the authenticated (user JWT)
+client, and is stopped on SIGNED_OUT and unmount. No network.
+
+```bash
+npx tsx scripts/verify-location-sync.ts
 ```
 
 ## `verify-supabase-env.ts`
@@ -19,7 +50,7 @@ project ref is the existing shared `qwaehqsmodekbgvnaavz` project, refuses
 service-role/secret keys, initialises `createClient()` with the same options
 as `src/lib/supabaseClient.ts`, and performs a read-only live handshake
 (`/auth/v1/health`, `/rest/v1/`, `auth.getSession()`, one RLS-protected
-select). No dependency beyond what is already installed.
+select).
 
 ```bash
 npx tsx scripts/verify-supabase-env.ts             # includes the live handshake
