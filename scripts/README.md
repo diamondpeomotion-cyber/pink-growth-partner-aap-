@@ -19,14 +19,18 @@ Offline assertions (no credentials required):
 - `src/lib/supabaseClient.ts` re-exports the SAME client as
   `src/lib/supabase.ts` (no second auth system);
 - the `/auth/login` redirect helpers are idempotent and loop-free;
-- legacy-session storage migration is one-way and safe.
+- legacy-session storage migration is one-way and safe;
+- `clearProtectedState()` wipes the full protected `nexora_*` cache inventory.
 
-With a real `.env` it extends to live checks against the shared project, and
-with `GP_TEST_EMAIL`/`GP_TEST_PASSWORD` it also runs sign-in → `getUser()` →
-sign-out → session-cleared against the live auth service.
+With the real `.env.local` it extends to live checks against the shared
+project: real-key acceptance, PKCE OAuth initiation (code verifier persisted
+under the Nexora storage key), and — with `GP_TEST_EMAIL`/`GP_TEST_PASSWORD`
+in the environment — sign-in → persistent-session recovery across a second
+client (simulated reload) → sign-out clearing the shared slot.
 
 ```bash
-npx tsx scripts/verify-nexora-auth.ts
+npx tsx scripts/verify-nexora-auth.ts                 # offline + live when env present
+npx tsx scripts/verify-nexora-auth.ts --require-live  # exit 1 unless real key + credentials pass live checks
 ```
 
 ## `verify-location-sync.ts` — location sync lifecycle verification
@@ -34,12 +38,36 @@ npx tsx scripts/verify-nexora-auth.ts
 Renders `src/hooks/useLocationSync.ts` in jsdom against an in-memory fake of
 supabase-js and a stubbed `navigator.geolocation`. Asserts the watcher runs
 only for authenticated sessions, is deduplicated to a single instance (even
-under StrictMode), pushes accepted fixes through the authenticated (user JWT)
-client, and is stopped on SIGNED_OUT and unmount. No network.
+under StrictMode), saves accepted fixes through the canonical RPC
+`save_my_private_location` (payload carries **no** target user id — identity
+from `auth.uid()`), falls back to the RLS-gated table upsert when the RPC is
+absent, restores the user's saved row on session start without re-writing it,
+and stops the watcher on SIGNED_OUT and unmount. No network.
 
 ```bash
 npx tsx scripts/verify-location-sync.ts
 ```
+
+## `probe-location-schema.ts` — live location-schema probe
+
+Read-only probes against the real project using the anon key: canonical
+`user_private_locations` table + all ten columns, anonymous-write denial,
+`save_my_private_location` / `clear_my_private_location` existence and
+posture, and the legacy `user_locations` / `salons` shapes. With
+`--write` and GP test credentials it additionally performs an authenticated
+save → read-back → restore round-trip through the user JWT + RLS.
+
+```bash
+npx tsx scripts/probe-location-schema.ts            # read-only
+npx tsx scripts/probe-location-schema.ts --strict   # exit 1 on any failure
+GP_TEST_EMAIL=… GP_TEST_PASSWORD=… \
+  npx tsx scripts/probe-location-schema.ts --write  # authenticated round-trip
+```
+
+Live evidence captured on 2026-08-25 is recorded in
+`NEXORA-LIVE-VERIFICATION.md` (the dev sandbox has no direct egress to
+`*.supabase.co`; the scripts run the same probes on any machine/CI with
+egress).
 
 ## `verify-supabase-env.ts`
 

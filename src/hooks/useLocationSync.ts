@@ -9,8 +9,13 @@
 //   - Exactly ONE background sync watcher exists app-wide (module-level
 //     registry): re-mounts (React StrictMode) and repeated enables stop the
 //     previous watch before starting the next — no duplicate watchers.
-//   - Writes go through lib/locationSyncRepository.ts → the shared anon
-//     client + user JWT → RLS. No service_role anywhere.
+//   - Writes go through lib/locationSyncRepository.ts: canonical RPC
+//     save_my_private_location (identity derived from auth.uid() inside
+//     PostgreSQL) via the shared anon client + user JWT → RLS. No
+//     service_role anywhere.
+//   - On session start the user's private saved row is restored from the
+//     backend into the device fix cache (canonical SharedLocationSync.bind
+//     behaviour) and is never re-written back to the backend.
 //   - SIGNED_OUT / USER_DELETED / refresh-without-session stop the watcher
 //     and unsubscribe immediately (logout cleanup), independent of any React
 //     re-render timing.
@@ -21,10 +26,11 @@ import { supabase as appSupabase } from '../lib/supabase';
 import {
   startAccurateLocationWatch,
   readSavedFix,
+  LAST_FIX_STORAGE_KEY,
   type AccurateWatchHandle,
   type GeoReading,
 } from '../lib/locationService';
-import { syncUserLocation } from '../lib/locationSyncRepository';
+import { syncUserLocation, loadOwnLocation } from '../lib/locationSyncRepository';
 
 export interface UseLocationSyncOptions {
   /** Gate: only synchronize while the caller considers the user signed in. */
@@ -46,6 +52,14 @@ const activeSyncWatch: { handle: AccurateWatchHandle | null } = { handle: null }
 const MIN_SYNC_INTERVAL_MS = 30_000; // burst guard between backend writes
 const MAX_BASELINE_AGE_MS = 24 * 60 * 60 * 1000; // reuse yesterday's fix only
 
+const persistDeviceFix = (fix: GeoReading): void => {
+  try {
+    window.localStorage.setItem(LAST_FIX_STORAGE_KEY, JSON.stringify(fix));
+  } catch {
+    /* storage blocked — never fatal */
+  }
+};
+
 export function useLocationSync({
   enabled,
   client = appSupabase,
@@ -60,6 +74,8 @@ export function useLocationSync({
     let disposed = false;
     let sessionConfirmed = false;
     let lastSyncedAt = 0;
+    let restoredFromBackend = false;
+    let restoreInFlight = false;
 
     const pushFix = async (fix: GeoReading, source: 'baseline' | 'watch') => {
       const now = Date.now();
@@ -97,21 +113,41 @@ export function useLocationSync({
         // keeps waiting for the next reading.
         onError: () => {},
       });
-      // Re-publish the last accepted fix (fresh ones only) so the backend has
-      // a baseline the moment the session becomes active.
+      if (restoredFromBackend) return; // backend row is the baseline
+      // Otherwise re-publish the last accepted device fix (fresh ones only)
+      // so the backend has a baseline the moment the session becomes active.
       const saved = readSavedFix();
       if (saved && Date.now() - saved.timestamp < MAX_BASELINE_AGE_MS) {
         void pushFix(saved, 'baseline');
       }
     };
 
-    // Start only with a live session.
+    // Establish the session-scoped sync: restore the user's own saved row
+    // from the backend (canonical bind() behaviour), then start the watcher.
+    // Idempotent under StrictMode/getSession-event races.
+    const establishSession = () => {
+      sessionConfirmed = true;
+      if (restoreInFlight) return;
+      restoreInFlight = true;
+      void (async () => {
+        try {
+          const saved = await loadOwnLocation(client);
+          if (disposed) return;
+          if (saved) {
+            restoredFromBackend = true;
+            persistDeviceFix(saved);
+          }
+        } catch {
+          /* restore is best-effort — the watch still runs */
+        }
+        restoreInFlight = false;
+        if (!disposed) startWatch();
+      })();
+    };
+
     void auth.getSession().then(({ data }) => {
       if (disposed) return;
-      if (data.session) {
-        sessionConfirmed = true;
-        startWatch();
-      }
+      if (data.session) establishSession();
     });
 
     // Immediate cleanup on auth loss — does not wait for a React re-render.
@@ -123,13 +159,13 @@ export function useLocationSync({
         (event === 'TOKEN_REFRESHED' && !session)
       ) {
         sessionConfirmed = false;
+        restoredFromBackend = false;
         stopWatch();
         setError(null);
         return;
       }
       if (session && !sessionConfirmed) {
-        sessionConfirmed = true;
-        startWatch();
+        establishSession();
       }
     });
 

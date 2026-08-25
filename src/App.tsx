@@ -16,7 +16,7 @@ import {
   clearAllAuthStorage,
 } from './lib/supabaseClient';
 import { checkGrowthPartnerAccess } from './lib/gpRepository';
-import { forgetSelectedShop } from './lib/shopContext';
+import { clearProtectedState } from './lib/protectedState';
 import { redirectToLogin, restoreFromLogin } from './lib/authRedirect';
 import { useLocationSync } from './hooks/useLocationSync';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
@@ -138,27 +138,16 @@ export default function App() {
   // immediately (the config-error surface renders instead).
   const [authReady, setAuthReady] = useState(() => supabase === null);
   const authVerifySeq = useRef(0);
-  // Last user we authorized — needed to clear that user's protected local
-  // state (selected shop, dashboard cache) after the session disappears.
+  // Last user we authorized — its per-user caches are wiped by
+  // clearProtectedState(userId) when the session disappears (see
+  // lib/protectedState.ts: dashboard cache, partner profile, shop draft,
+  // selected-shop + GPS fix caches — the full nexora_* inventory).
   const authorizedUserIdRef = useRef<string | null>(null);
 
-  // Invalid/expired sessions must clear protected state: per-user caches are
-  // wiped the moment the session goes away (SIGNED_OUT, failed refresh, role
-  // denial, logout). The login convenience fields (remembered username) are
-  // deliberately kept — they are not protected data.
-  const clearProtectedState = () => {
-    try {
-      if (authorizedUserIdRef.current) forgetSelectedShop(authorizedUserIdRef.current);
-    } catch {
-      /* ignore */
-    }
+  // Wipe the signed-out user's protected caches and drop the id reference.
+  const clearProtectedStateForCurrentUser = () => {
+    clearProtectedState(authorizedUserIdRef.current);
     authorizedUserIdRef.current = null;
-    try {
-      localStorage.removeItem('nexora_dashboard_cache');
-      localStorage.removeItem('nexora_last_sync_timestamp');
-    } catch {
-      /* ignore */
-    }
   };
 
   // ---- Password recovery (Phase 3) ----
@@ -219,7 +208,7 @@ export default function App() {
       const seq = ++authVerifySeq.current;
       if (!session?.user) {
         if (!cancelled) {
-          clearProtectedState();
+          clearProtectedStateForCurrentUser();
           setIsLoggedIn(false);
           setAuthReady(true);
         }
@@ -243,7 +232,7 @@ export default function App() {
           if (definitiveRejection) {
             await client.auth.signOut({ scope: 'local' }).catch(() => {});
             if (!cancelled && seq === authVerifySeq.current) {
-              clearProtectedState();
+              clearProtectedStateForCurrentUser();
               setIsLoggedIn(false);
               setAuthReady(true);
             }
@@ -268,7 +257,7 @@ export default function App() {
         await client.auth.signOut({ scope: 'global' }).catch(() => {});
         await client.auth.signOut({ scope: 'local' }).catch(() => {});
         if (!cancelled) {
-          clearProtectedState();
+          clearProtectedStateForCurrentUser();
           setIsLoggedIn(false);
           setAuthReady(true);
         }
@@ -309,7 +298,7 @@ export default function App() {
       // (USER_DELETED is compared as a widened string: newer auth-js versions
       // emit it, the installed one does not yet expose it in the union.)
       if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
-        clearProtectedState();
+        clearProtectedStateForCurrentUser();
         setIsLoggedIn(false);
         setAuthReady(true);
         return;
@@ -321,7 +310,7 @@ export default function App() {
         if (session) {
           setAuthReady(true);
         } else {
-          clearProtectedState();
+          clearProtectedStateForCurrentUser();
           setIsLoggedIn(false);
           setAuthReady(true);
         }
@@ -471,7 +460,7 @@ export default function App() {
         void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
         clearAllAuthStorage();
       }
-      clearProtectedState();
+      clearProtectedStateForCurrentUser();
       setRecoveryBoth('none');
       setRecoveryError(null);
       setIsLoggedIn(false);

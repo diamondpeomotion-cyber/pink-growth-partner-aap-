@@ -264,7 +264,9 @@ export const supabaseConfigError = config.isValid ? null : config.error;
 /**
  * Build a Nexora-configured client. Used by the app singleton below and by
  * the live verification scripts so tests exercise the EXACT same auth
- * options as production.
+ * options as production. Mirrors the canonical Nexora client factory
+ * (packages/auth/src/client.ts in the main-website repo), including the
+ * x-nexora-client marker header.
  */
 export const buildNexoraClient = (url: string, anonKey: string): SupabaseClient =>
   createClient(url, anonKey, {
@@ -274,6 +276,11 @@ export const buildNexoraClient = (url: string, anonKey: string): SupabaseClient 
       autoRefreshToken: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
+    },
+    global: {
+      headers: {
+        'x-nexora-client': 'nexora-auth/1',
+      },
     },
   });
 

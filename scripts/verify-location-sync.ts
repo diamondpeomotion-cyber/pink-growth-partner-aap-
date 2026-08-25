@@ -10,10 +10,16 @@
  *   2. Enabled hook WITHOUT a session never starts a watcher.
  *   3. Enabled hook WITH a session starts exactly ONE watcher (no duplicate
  *      watchers), even under React StrictMode double-mounting.
- *   4. An accepted fix (accuracy <= 30 m) is pushed to the backend through
- *      the authenticated client (user JWT path — no service role anywhere).
- *   5. SIGNED_OUT stops the watcher immediately (cleanup on logout).
- *   6. Unmount stops the watcher (cleanup on unmount).
+ *   4. An accepted fix (accuracy <= 30 m) is saved through the canonical
+ *      RPC save_my_private_location — identity is derived from auth.uid()
+ *      server-side, so the payload contains NO target user_id.
+ *   5. When the canonical RPC is absent (PGRST202), the repository falls
+ *      back to an RLS-gated upsert on user_private_locations carrying the
+ *      VERIFIED (getUser) user id.
+ *   6. The user's own saved row is restored from the backend on session
+ *      start (loadOwnLocation) and never re-written back.
+ *   7. SIGNED_OUT stops the watcher immediately (cleanup on logout).
+ *   8. Unmount stops the watcher (cleanup on unmount).
  *
  * No network, no real project. Lives outside src/; nothing imports it.
  */
@@ -50,20 +56,14 @@ const geoState = {
   clearCalls: 0,
   activeWatches: new Set<number>(),
   successCb: null as ((pos: { coords: { latitude: number; longitude: number; accuracy: number }; timestamp: number }) => void) | null,
-  errorCb: null as ((err: { code: number; message: string }) => void) | null,
 };
 let nextWatchId = 1;
 (dom.window.navigator as unknown as Record<string, unknown>).geolocation = {
-  watchPosition: (
-    success: (pos: unknown) => void,
-    error: (err: unknown) => void,
-    _opts?: unknown,
-  ) => {
+  watchPosition: (success: (pos: unknown) => void, _error: (err: unknown) => void, _opts?: unknown) => {
     geoState.watchCalls += 1;
     const id = nextWatchId++;
     geoState.activeWatches.add(id);
     geoState.successCb = success as never;
-    geoState.errorCb = error as never;
     return id;
   },
   clearWatch: (id: number) => {
@@ -72,29 +72,25 @@ let nextWatchId = 1;
   },
 };
 
-// ---- Fake supabase-js client (user JWT path only) -------------------------
+// ---- Fake supabase-js client ----------------------------------------------
 interface BackendCall {
-  table: string;
-  method: 'upsert' | 'update';
-  payload: Record<string, unknown>;
+  kind: 'rpc' | 'upsert';
+  fn?: string;
+  params?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+  table?: string;
 }
 const backendCalls: BackendCall[] = [];
 let unsubscribed = 0;
 
-const makeFakeClient = (opts: { session: unknown } = { session: null }) => {
+const makeFakeClient = (opts: {
+  session: unknown;
+  rpcError?: { code: string; message: string } | null;
+  savedRow?: Record<string, unknown> | null;
+  savedReads?: { count: number };
+} = { session: null }) => {
   const listeners: Array<(event: string, session: unknown) => void> = [];
-  const chain = {
-    upsert: (payload: Record<string, unknown>, _opts?: unknown) => {
-      backendCalls.push({ table: 'user_locations', method: 'upsert', payload });
-      return Promise.resolve({ error: null, data: null });
-    },
-    update: (payload: Record<string, unknown>) => ({
-      eq: (_col: string, _val: unknown) => {
-        backendCalls.push({ table: 'profiles', method: 'update', payload });
-        return Promise.resolve({ error: null, data: null });
-      },
-    }),
-  };
+  const reads = opts.savedReads ?? { count: 0 };
   return {
     auth: {
       getUser: () => Promise.resolve({ data: { user: { id: 'user-1' } }, error: null }),
@@ -115,7 +111,29 @@ const makeFakeClient = (opts: { session: unknown } = { session: null }) => {
         for (const cb of listeners) cb(event, session);
       },
     },
-    from: (table: string) => (table === 'user_locations' ? chain : { ...chain }),
+    rpc: (fn: string, params: Record<string, unknown>) => {
+      backendCalls.push({ kind: 'rpc', fn, params });
+      return Promise.resolve(opts.rpcError ? { error: opts.rpcError, data: null } : { error: null, data: null });
+    },
+    from: (table: string) => {
+      const api: Record<string, unknown> = {
+        select: () => api,
+        eq: () => api,
+        maybeSingle: () => {
+          reads.count += 1;
+          return Promise.resolve({ data: opts.savedRow ?? null, error: null });
+        },
+        upsert: (payload: Record<string, unknown>) => {
+          backendCalls.push({ kind: 'upsert', table, payload });
+          return Promise.resolve({ error: null, data: null });
+        },
+        update: (payload: Record<string, unknown>) => ({
+          eq: () => Promise.resolve({ error: null, data: null }),
+          payload,
+        }),
+      };
+      return api;
+    },
   };
 };
 
@@ -181,7 +199,7 @@ const reset = () => {
   dom.window.localStorage.removeItem('nexora_last_accurate_fix');
 };
 
-console.log('\nAuthenticated location sync — offline lifecycle verification');
+console.log('\nAuthenticated location sync — offline lifecycle verification (canonical RPC)');
 console.log('='.repeat(64));
 
 // 1. Disabled hook — never starts a watcher
@@ -202,32 +220,81 @@ console.log('='.repeat(64));
   await unmount();
 }
 
-// 3. Enabled + session → exactly one watcher; fix is synced to the backend
+// 3. Enabled + session → exactly one watcher; fix saved via canonical RPC
 {
   reset();
   const client = makeFakeClient({ session });
   const { unmount } = await render(React.createElement(Probe, { enabled: true, client }));
   assert(geoState.watchCalls === 1, 'authenticated: exactly ONE GPS watcher started');
-  assert(geoState.successCb !== null, 'watch success callback armed');
   const fix = { coords: { latitude: 26.9124, longitude: 75.7873, accuracy: 5 }, timestamp: Date.now() };
   await act(async () => {
     geoState.successCb?.(fix);
     await sleep(25);
   });
+  const rpcCalls = backendCalls.filter((c) => c.kind === 'rpc' && c.fn === 'save_my_private_location');
+  assert(rpcCalls.length === 1, 'accepted fix saved through canonical RPC save_my_private_location');
   assert(
-    backendCalls.some(
-      (c) =>
-        c.method === 'upsert' &&
-        c.payload.user_id === 'user-1' &&
-        c.payload.latitude === 26.9124 &&
-        c.payload.longitude === 75.7873,
-    ),
-    'accepted fix pushed to backend as the authenticated user (user_id set, JWT client)',
+    Boolean(rpcCalls[0]) &&
+      (rpcCalls[0].params as Record<string, unknown>).p_latitude === 26.9124 &&
+      (rpcCalls[0].params as Record<string, unknown>).p_longitude === 75.7873 &&
+      (rpcCalls[0].params as Record<string, unknown>).p_accuracy_m === 5,
+    'RPC payload carries p_latitude/p_longitude/p_accuracy_m',
+  );
+  assert(
+    !('user_id' in (rpcCalls[0]?.params ?? {})) && !('p_user_id' in (rpcCalls[0]?.params ?? {})),
+    'RPC payload contains NO target user id (identity from auth.uid() server-side)',
+  );
+  assert(
+    typeof (rpcCalls[0]?.params as Record<string, unknown>).p_captured_at === 'string' &&
+      !Number.isNaN(Date.parse(String((rpcCalls[0]?.params as Record<string, unknown>).p_captured_at))),
+    'RPC payload carries a valid p_captured_at ISO timestamp',
   );
   await unmount();
 }
 
-// 4. StrictMode double-mount — still exactly one watcher (no duplicates)
+// 4. Canonical RPC absent (PGRST202) → RLS-gated table upsert fallback
+{
+  reset();
+  const client = makeFakeClient({ session, rpcError: { code: 'PGRST202', message: 'Could not find the function' } });
+  const { unmount } = await render(React.createElement(Probe, { enabled: true, client }));
+  const fix = { coords: { latitude: 26.9124, longitude: 75.7873, accuracy: 8 }, timestamp: Date.now() };
+  await act(async () => {
+    geoState.successCb?.(fix);
+    await sleep(25);
+  });
+  const upserts = backendCalls.filter((c) => c.kind === 'upsert' && c.table === 'user_private_locations');
+  assert(upserts.length === 1, 'fallback: upsert into user_private_locations after PGRST202');
+  assert(
+    Boolean(upserts[0]) && upserts[0].payload?.user_id === 'user-1',
+    'fallback payload carries the VERIFIED user id (getUser) — RLS still enforced server-side',
+  );
+  await unmount();
+}
+
+// 5. Saved row restored from backend on session start, never re-written
+{
+  reset();
+  const savedReads = { count: 0 };
+  const client = makeFakeClient({
+    session,
+    savedReads,
+    savedRow: {
+      latitude: 26.9,
+      longitude: 75.8,
+      accuracy_m: 12,
+      captured_at: new Date(Date.now() - 60_000).toISOString(),
+    },
+  });
+  const { unmount } = await render(React.createElement(Probe, { enabled: true, client }));
+  assert(savedReads.count >= 1, 'session start: own location row loaded from backend (loadOwnLocation)');
+  const stored = dom.window.localStorage.getItem('nexora_last_accurate_fix');
+  assert(Boolean(stored), 'restored row persisted into the device fix cache');
+  const rpcWrites = backendCalls.filter((c) => c.kind === 'rpc' && c.fn === 'save_my_private_location');
+  assert(rpcWrites.length === 0, 'restored row is NOT written back to the backend (no loop)');
+  await unmount();
+}
+
+// 6. StrictMode double-mount — still exactly one watcher (no duplicates)
 {
   reset();
   const client = makeFakeClient({ session });
@@ -236,7 +303,7 @@ console.log('='.repeat(64));
   await unmount();
 }
 
-// 5. SIGNED_OUT — watcher stopped immediately, subscription unsubscribed
+// 7. SIGNED_OUT — watcher stopped immediately, subscription unsubscribed
 {
   reset();
   const client = makeFakeClient({ session });
@@ -252,7 +319,7 @@ console.log('='.repeat(64));
   assert(unsubscribed > beforeUnmountUnsubs, 'unmount: auth subscription unsubscribed');
 }
 
-// 6. Unmount while active — watcher stopped
+// 8. Unmount while active — watcher stopped
 {
   reset();
   const client = makeFakeClient({ session });
@@ -262,7 +329,7 @@ console.log('='.repeat(64));
   assert(geoState.activeWatches.size === 0, 'unmount: watcher cleared (no orphan GPS watch)');
 }
 
-// 7. Re-enable after SIGNED_OUT — watcher restarts exactly once
+// 9. Re-enable after SIGNED_OUT — watcher restarts exactly once
 {
   reset();
   const client = makeFakeClient({ session });
@@ -272,8 +339,6 @@ console.log('='.repeat(64));
     await sleep(10);
   });
   assert(geoState.activeWatches.size === 0, 'after SIGNED_OUT: idle');
-  // The real App ties `enabled` to the auth state: sign-out flips it off,
-  // a fresh sign-in flips it back on.
   await rendered.rerender(React.createElement(Probe, { enabled: false, client }));
   await rendered.rerender(React.createElement(Probe, { enabled: true, client }));
   assert(geoState.activeWatches.size === 1, 're-enable: single watcher resumed');
@@ -283,7 +348,7 @@ console.log('='.repeat(64));
 
 console.log('\n' + '='.repeat(64));
 if (failures === 0) {
-  console.log('\u001b[32mRESULT: location sync lifecycle verified — authenticated-only, single watcher, cleanup on logout/unmount.\u001b[0m\n');
+  console.log('\u001b[32mRESULT: location sync lifecycle verified — authenticated-only, canonical RPC, single watcher, cleanup on logout/unmount.\u001b[0m\n');
   process.exit(0);
 }
 console.log(`\u001b[31mRESULT: ${failures} assertion(s) failed.\u001b[0m\n`);
