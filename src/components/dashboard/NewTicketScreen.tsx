@@ -27,14 +27,9 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setShowSuccess(true);
-      setTimeout(() => {
-        onBack();
-      }, 2000);
-    }, 1500);
+    setIsSubmitting(false);
+    setShowSuccess(false);
+    alert('Support tickets are not stored on the server from this screen yet. Email Nexora ops instead.');
   };
 
   return (

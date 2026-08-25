@@ -20,9 +20,6 @@ import { isGrowthPartnerRole } from '../lib/gpRepository';
 
 type AuthMode = 'login' | 'signup';
 
-const PARTNER_PROFILE_KEY = 'nexora_partner_profile';
-const REGISTERED_PARTNERS_KEY = 'nexora_registered_partners';
-
 interface SignupErrors {
   fullName?: string;
   mobile?: string;
@@ -65,7 +62,7 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
     }
   });
   const [errors, setErrors] = useState({ username: '', password: '' });
-  const [passwordStrength, setPasswordStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
+  const [_passwordStrength, setPasswordStrength] = useState({ minLength: false, hasNumber: false, hasUpper: false });
   const [message, setMessage] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; text: string } | null>(null);
 
   // ---------------- Sign up state ----------------
@@ -451,11 +448,6 @@ export default function LoginForm({ onLoginSuccess }: { onLoginSuccess: () => vo
               </button>
             </div>
             {errors.password && <p className="text-xs text-[#93000a] mt-1">{errors.password}</p>}
-            <div className="text-xs space-y-1 mt-2">
-              <p className={passwordStrength.minLength ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• Min 6 characters</p>
-              <p className={passwordStrength.hasNumber ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one number</p>
-              <p className={passwordStrength.hasUpper ? 'text-[#2E7D32]' : 'text-[#8e6f77]'}>• At least one uppercase letter</p>
-            </div>
           </div>
 
           <div className="flex items-center justify-between">

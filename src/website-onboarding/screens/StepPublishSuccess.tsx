@@ -480,7 +480,7 @@ export default function StepPublishSuccess({ data, setData, onNext, onSave }: Pr
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent"></div>
                   <div className="absolute bottom-2.5 left-3.5 right-3.5">
                     <h2 className="text-sm font-bold text-white drop-shadow-sm truncate">
-                      {data.salonName || 'Royal Hair & Beauty Studio'}
+                      {data.salonName || 'Your salon'}
                     </h2>
                     <p className="text-[9px] text-white/90 drop-shadow-sm truncate mt-0.5">
                       {data.tagline || 'Premium Hair & Spa Care'}

@@ -649,7 +649,7 @@ export default function RewardDetailsScreen({
               </div>
 
               <p className="text-xs text-gray-600 leading-normal font-semibold">
-                Congratulations Rajesh! Your claim request for the <span className="text-[#b90064] font-black">{activeReward.name}</span> valued at <span className="font-bold">₹{activeReward.maxValue.toLocaleString()}</span> has been securely submitted.
+                Your claim preference for the <span className="text-[#b90064] font-black">{activeReward.name}</span> (catalogue value ₹{activeReward.maxValue.toLocaleString()}) was noted on this device. Nexora ops must fulfil it — this app does not ship goods or pay cash.
               </p>
 
               <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-left text-xs space-y-1 text-gray-500">

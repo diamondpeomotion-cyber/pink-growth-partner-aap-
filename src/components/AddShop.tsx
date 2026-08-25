@@ -161,7 +161,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [preferredLang, setPreferredLang] = useState(() => draft.preferredLang ?? 'hi');
   const [isVerified, setIsVerified] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpValues, setOtpValues] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
   const [dupCheckStatus, setDupCheckStatus] = useState<'none' | 'success' | 'warning'>('none');
   const [draftSaved, setDraftSaved] = useState(false);
 
@@ -196,30 +196,26 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     if (geo.error) queueMicrotask(() => setIsDetectingLocation(false));
   }, [geo.error]);
   
-  const [stateName, setStateName] = useState(() => draft.stateName ?? 'Rajasthan');
-  const [districtName, setDistrictName] = useState(() => draft.districtName ?? 'Jaipur');
-  const [cityName, setCityName] = useState(() => draft.cityName ?? 'Jaipur');
-  const [localityName, setLocalityName] = useState(() => draft.localityName ?? 'Mansarovar');
-  const [fullAddress, setFullAddress] = useState(() => draft.fullAddress ?? '72, Madhyam Marg, Mansarovar, Jaipur');
-  const [pincode, setPincode] = useState(() => draft.pincode ?? '302020');
-  const [landmark, setLandmark] = useState(() => draft.landmark ?? 'Near Metro Station');
+  const [stateName, setStateName] = useState(() => draft.stateName ?? '');
+  const [districtName, setDistrictName] = useState(() => draft.districtName ?? '');
+  const [cityName, setCityName] = useState(() => draft.cityName ?? '');
+  const [localityName, setLocalityName] = useState(() => draft.localityName ?? '');
+  const [fullAddress, setFullAddress] = useState(() => draft.fullAddress ?? '');
+  const [pincode, setPincode] = useState(() => draft.pincode ?? '');
+  const [landmark, setLandmark] = useState(() => draft.landmark ?? '');
 
   // Step 3 State: Business Details
   const [openingTime, setOpeningTime] = useState('10:00');
   const [closingTime, setClosingTime] = useState('20:00');
   const [weeklyOff, setWeeklyOff] = useState('Tuesday');
-  const [staffCount, setStaffCount] = useState('6');
-  const [startingPrice, setStartingPrice] = useState('300');
-  const [yearsInBusiness, setYearsInBusiness] = useState('5');
+  const [staffCount, setStaffCount] = useState('');
+  const [startingPrice, setStartingPrice] = useState('');
+  const [yearsInBusiness, setYearsInBusiness] = useState('');
   const [businessGenderType, setBusinessGenderType] = useState('Women');
-  const [gstin, setGstin] = useState(() => draft.gstin ?? '08AAAAA0000A1Z5');
+  const [gstin, setGstin] = useState(() => draft.gstin ?? '');
   const [businessType, setBusinessType] = useState(() => draft.businessType ?? 'proprietorship');
   const [annualTurnover, setAnnualTurnover] = useState(() => draft.annualTurnover ?? '10l_25l');
-  const [services, setServices] = useState([
-    { name: 'Haircut', price: '400', duration: '30 mins' },
-    { name: 'Facial', price: '1,200', duration: '60 mins' },
-    { name: 'Hair Colour', price: '2,500', duration: '90 mins' },
-  ]);
+  const [services, setServices] = useState<{ name: string; price: string; duration: string }[]>([]);
   const [aboutShop, setAboutShop] = useState('');
   const [isAddingService, setIsAddingService] = useState(false);
   const [newServiceName, setNewServiceName] = useState('');
@@ -227,7 +223,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [newServiceDuration, setNewServiceDuration] = useState('');
 
   // Step 4 State: Website Setup & Branding
-  const [websiteUrl, setWebsiteUrl] = useState(() => draft.websiteUrl ?? 'https://glowbeautyparlour.com');
+  const [websiteUrl, setWebsiteUrl] = useState(() => draft.websiteUrl ?? '');
   const [isPublished, setIsPublished] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('store_is_published');
@@ -235,7 +231,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     } catch (err) {
       console.warn('Unable to read published flag:', err);
     }
-    return draft.isPublished ?? true;
+    return draft.isPublished ?? false;
   });
 
   const handleTogglePublish = () => {
@@ -256,20 +252,18 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       triggerDocToast('info', 'Store Unpublished', 'Store is currently hidden from public.');
     }
   };
-  const [instagramHandle, setInstagramHandle] = useState(() => draft.instagramHandle ?? '@glowbeauty_jaipur');
+  const [instagramHandle, setInstagramHandle] = useState(() => draft.instagramHandle ?? '');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>(() => draft.socialLinks ?? {
-    facebook: 'https://facebook.com/glowbeautyjaipur',
-    instagram: 'https://instagram.com/glowbeauty_jaipur',
-    youtube: 'https://youtube.com/@glowbeautyjaipur',
-    linkedin: 'https://linkedin.com/company/glowbeautyjaipur',
-    twitter: 'https://x.com/glowbeautyjpr',
-    snapchat: 'https://snapchat.com/add/glowbeautyjpr',
-    googleBusiness: 'https://maps.app.goo.gl/glowbeautyjaipur',
+    facebook: '',
+    instagram: '',
+    youtube: '',
+    linkedin: '',
+    twitter: '',
+    snapchat: '',
+    googleBusiness: '',
   });
   const [customLinks, setCustomLinks] = useState<{ id: string; title: string; url: string }[]>(
-    () => draft.customLinks ?? [
-      { id: 'c1', title: 'Online Appointment Booking', url: 'https://booking.glowbeauty.com' }
-    ]
+    () => draft.customLinks ?? []
   );
   const [socialErrors, setSocialErrors] = useState<Record<string, string>>({});
 
@@ -406,60 +400,22 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
   const [selectedTemplate, setSelectedTemplate] = useState('modern-salon');
   const [devState, setDevState] = useState<'default' | 'empty' | 'uploading' | 'error'>('default');
-  const [coverPhoto, setCoverPhoto] = useState<string | null>('https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop');
-  const [shopLogo, setShopLogo] = useState<string | null>('https://images.unsplash.com/photo-1556760544-74068565f05c?q=80&w=200&auto=format&fit=crop');
-  const [interiorPhotos, setInteriorPhotos] = useState<string[]>([
-    'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?q=80&w=400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1519699047748-de8e457a634e?q=80&w=400&auto=format&fit=crop'
-  ]);
+  const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
+  const [shopLogo, setShopLogo] = useState<string | null>(null);
+  const [interiorPhotos, setInteriorPhotos] = useState<string[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<{ id: string, name: string, img: string, desc: string } | null>(null);
 
   // Step 5 State: Documents
-  const [panNumber, setPanNumber] = useState(() => draft.panNumber ?? 'ABCDE1234F');
-  const [panUploaded, setPanUploaded] = useState(true);
-  const [addressProofUploaded, setAddressProofUploaded] = useState(true);
-  const [ownerIdProofFile, setOwnerIdProofFile] = useState<string | null>('owner-id-proof.jpg');
-  const [ownerIdProofSize, setOwnerIdProofSize] = useState<string>('1.2 MB');
-  const [shopFrontFile, setShopFrontFile] = useState<string | null>('glow-shop-front.jpg');
-  const [shopFrontPreview, setShopFrontPreview] = useState<string | null>('https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk');
+  const [panNumber, setPanNumber] = useState(() => draft.panNumber ?? '');
+  const [panUploaded, setPanUploaded] = useState(false);
+  const [addressProofUploaded, setAddressProofUploaded] = useState(false);
+  const [ownerIdProofFile, setOwnerIdProofFile] = useState<string | null>(null);
+  const [ownerIdProofSize, setOwnerIdProofSize] = useState<string>('');
+  const [shopFrontFile, setShopFrontFile] = useState<string | null>(null);
+  const [shopFrontPreview, setShopFrontPreview] = useState<string | null>(null);
 
   // Enhanced Document Management State
-  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([
-    {
-      id: 'doc_aadhaar_front',
-      type: 'aadhaar_front',
-      typeLabel: 'Aadhaar Card - Front',
-      fileName: 'aadhaar-card-front.jpg',
-      fileSize: '1.4 MB',
-      fileSizeBytes: 1468006,
-      previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop',
-      isImage: true,
-      uploadedAt: new Date().toLocaleDateString()
-    },
-    {
-      id: 'doc_pan_card',
-      type: 'pan_card',
-      typeLabel: 'PAN Card',
-      fileName: 'pan-card-owner.pdf',
-      fileSize: '0.9 MB',
-      fileSizeBytes: 943718,
-      previewUrl: null,
-      isImage: false,
-      uploadedAt: new Date().toLocaleDateString()
-    },
-    {
-      id: 'doc_shop_front',
-      type: 'shop_front',
-      typeLabel: 'Shop Front Photo',
-      fileName: 'glow-shop-front.jpg',
-      fileSize: '2.3 MB',
-      fileSizeBytes: 2411724,
-      previewUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBQNNRMJrTd4yrU1ERtGLA59fMj94JhY_GnmUgH5xmlDwZOMqtSd-NJvOHh4FOsKs2T-psTq0sxdBpDjy3fBODZhUlbuWU7qSq3586FxjZ78RyYQMbmsNpRyv-xjkJO1-CA6RRFSIVmPJc4J25Xn0nJihno9c-Q9wmJvpASijmuiPCsdRi5gWbwMFV02r403xHiPJKRv-ecZZ-GG_A7AN82eVxiL_e4ubRN4-8QF-sqe9_uSWJkbnNk',
-      isImage: true,
-      uploadedAt: new Date().toLocaleDateString()
-    }
-  ]);
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([]);
 
   const [selectedDocTypeForUpload, setSelectedDocTypeForUpload] = useState<GovtDocType | 'other'>('aadhaar_front');
   const [customDocTypeLabel, setCustomDocTypeLabel] = useState<string>('');
@@ -688,8 +644,8 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       `"${typeLabel}" has been removed.`
     );
   };
-  const [confirmAccurate, setConfirmAccurate] = useState<boolean>(true);
-  const [authorizeProfile, setAuthorizeProfile] = useState<boolean>(true);
+  const [confirmAccurate, setConfirmAccurate] = useState<boolean>(false);
+  const [authorizeProfile, setAuthorizeProfile] = useState<boolean>(false);
   const [documentPrivacyConsent, setDocumentPrivacyConsent] = useState<boolean>(false);
   // Lets the Continue handler scroll the mandatory consent into view and flash
   // it, instead of silently refusing to advance.
@@ -916,9 +872,16 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
 
   const verifyOtp = () => {
+    // There is no SMS OTP provider in this app. Confirming the 10-digit number
+    // is entered is the only local check — never claim a telecom verification.
+    if (mobileNumber.replace(/\D/g, '').length !== 10) {
+      triggerDocToast('error', 'Mobile number required', 'Enter a 10-digit mobile number first.');
+      return;
+    }
     setShowOtpModal(false);
     setIsVerified(true);
-    setDupCheckStatus('success');
+    setDupCheckStatus('none');
+    triggerDocToast('info', 'Number confirmed', 'SMS OTP is not sent from this app. The shop owner will verify their phone later.');
   };
 
   // NOTE: the saved draft is now restored via lazy useState initialisation
@@ -1686,7 +1649,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
               <div className="flex flex-col gap-2.5 mb-6">
                 <div className="bg-[#EBF9F1] border border-[#C6F0D6] rounded-2xl p-3.5 flex gap-2.5 items-center">
                   <CheckCircle2 size={18} className="text-[#00A859] shrink-0" />
-                  <p className="text-xs text-[#008A48] font-semibold">This shop is inside your assigned Jaipur territory.</p>
+                  <p className="text-xs text-[#008A48] font-semibold">GPS coordinates will be saved with the application when a fix is accepted.</p>
                 </div>
                 <div className="bg-[#EBF9F1] border border-[#C6F0D6] rounded-2xl p-3.5 flex gap-2.5 items-center">
                   <CheckCircle2 size={18} className="text-[#00A859] shrink-0" />

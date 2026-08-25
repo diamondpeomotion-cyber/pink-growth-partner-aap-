@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { resolveGrowthPartner, fetchMyPayouts } from '../../lib/gpRepository';
+import { resolveGrowthPartner, fetchMyPayouts, fetchCommissionSummary, paiseToRupees, formatINR } from '../../lib/gpRepository';
 import {
   ArrowLeft,
   Calendar,
@@ -39,6 +39,10 @@ export default function PayoutHistoryScreen({
 }) {
   const [payouts, setPayouts] = useState<PayoutItem[]>([]);
   const [selectedPayout, setSelectedPayout] = useState<PayoutItem | null>(null);
+  const [payableRupees, setPayableRupees] = useState(0);
+  const [paidRupees, setPaidRupees] = useState(0);
+  const [heldRupees, setHeldRupees] = useState(0);
+  const [nextRelease, setNextRelease] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,8 +53,15 @@ export default function PayoutHistoryScreen({
         if (!user || cancelled) return;
         const partner = await resolveGrowthPartner(supabase, user.id);
         if (!partner || cancelled) { setPayouts([]); return; }
-        const rows = await fetchMyPayouts(supabase, String(partner.id));
+        const [rows, summary] = await Promise.all([
+          fetchMyPayouts(supabase, String(partner.id)),
+          fetchCommissionSummary(supabase, String(partner.id)),
+        ]);
         if (cancelled) return;
+        setPayableRupees(paiseToRupees(summary.payablePaise));
+        setPaidRupees(paiseToRupees(summary.paidPaise));
+        setHeldRupees(paiseToRupees(summary.heldPaise));
+        setNextRelease(summary.nextReleaseDate);
         setPayouts(rows.map((p) => ({
           id: p.id,
           payoutId: p.id.slice(0, 8).toUpperCase(),
@@ -71,8 +82,8 @@ export default function PayoutHistoryScreen({
   
   // Interactive simulator for resolving the failed payout
   const [showResolveModal, setShowResolveModal] = useState(false);
-  const [newIFSC, setNewIFSC] = useState('SBIN0001234');
-  const [newAccount, setNewAccount] = useState('348291048940');
+  const [newIFSC, setNewIFSC] = useState('');
+  const [newAccount, setNewAccount] = useState('');
   const [isResolving, setIsResolving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -160,12 +171,12 @@ export default function PayoutHistoryScreen({
           <div className="relative z-10 space-y-4">
             <div>
               <span className="text-[10px] text-pink-200 font-bold uppercase tracking-wider block mb-0.5">Available for Payout</span>
-              <h2 className="text-3xl font-black tracking-tight">₹8,400</h2>
+              <h2 className="text-3xl font-black tracking-tight">{formatINR(payableRupees)}</h2>
             </div>
             
             <div className="inline-flex items-center gap-2 bg-white/15 rounded-xl py-2 px-3 backdrop-blur-md text-[11px] font-bold">
               <Clock size={13} className="text-pink-300" />
-              <span>Next Automated Tuesday Payout: 04 Aug 2026</span>
+              <span>{nextRelease ? `Next hold release: ${new Date(nextRelease).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'No held commissions'}</span>
             </div>
           </div>
         </section>
@@ -177,7 +188,7 @@ export default function PayoutHistoryScreen({
               <CheckCircle2 size={15} className="text-emerald-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Total Paid Out</span>
             </div>
-            <div className="text-lg font-black text-gray-900">₹59,600</div>
+            <div className="text-lg font-black text-gray-900">{formatINR(paidRupees)}</div>
           </div>
 
           <div className="bg-white p-4 rounded-3xl border border-gray-200/60 shadow-2xs flex flex-col justify-between">

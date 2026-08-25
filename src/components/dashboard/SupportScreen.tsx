@@ -25,22 +25,7 @@ interface Ticket {
   type: 'warning' | 'tertiary' | 'success';
 }
 
-const ACTIVE_TICKETS: Ticket[] = [
-  {
-    id: 'SUP-1028',
-    title: 'Reward Claim Issue',
-    status: 'Under Review',
-    lastUpdated: '15 Aug 2026',
-    type: 'warning'
-  },
-  {
-    id: 'SUP-0942',
-    title: 'Payout Delay',
-    status: 'Resolved',
-    lastUpdated: '02 Aug 2026',
-    type: 'success'
-  }
-];
+const ACTIVE_TICKETS: Ticket[] = [];
 
 const HELP_TOPICS = [
   { id: 'onboarding', label: 'Shop Onboarding', icon: Store },
@@ -78,11 +63,9 @@ export default function SupportScreen({
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setShowSuccess(true);
-      triggerToast('Request submitted successfully!');
-    }, 1500);
+    setIsSubmitting(false);
+    setShowSuccess(false);
+    triggerToast('Support tickets are not stored on the server from this screen yet. Email Nexora ops instead.');
   };
 
   return (
@@ -129,8 +112,8 @@ export default function SupportScreen({
             RK
           </div>
           <div>
-            <p className="text-base font-bold text-[#1b1c1b] tracking-tight">Rajesh Kumar</p>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">GP-JPR-1024</p>
+            <p className="text-base font-bold text-[#1b1c1b] tracking-tight">Growth Partner</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Help centre</p>
           </div>
         </div>
 
@@ -208,6 +191,9 @@ export default function SupportScreen({
                 exit={{ opacity: 0, y: -10 }}
                 className="flex flex-col gap-4"
               >
+                {ACTIVE_TICKETS.length === 0 && (
+                  <p className="text-xs text-gray-500 font-medium">No support tickets are stored for this account in this app.</p>
+                )}
                 {ACTIVE_TICKETS.map((ticket) => (
                   <div 
                     key={ticket.id}

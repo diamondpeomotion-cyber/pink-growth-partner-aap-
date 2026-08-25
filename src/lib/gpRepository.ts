@@ -38,7 +38,29 @@ export interface CommissionSummary {
   payableCount: number;
   paidCount: number;
   nextReleaseDate: string | null;
+  /** Commissions created in the last 7 days (held + payable + paid). */
+  weekPaise: number;
+  /** held + payable + paid (void/clawed_back excluded). */
+  lifetimePaise: number;
 }
+
+export const emptyCommissionSummary = (): CommissionSummary => ({
+  heldPaise: 0,
+  payablePaise: 0,
+  paidPaise: 0,
+  heldCount: 0,
+  payableCount: 0,
+  paidCount: 0,
+  nextReleaseDate: null,
+  weekPaise: 0,
+  lifetimePaise: 0,
+});
+
+/** Convert paise to whole rupees for display (never invents a value). */
+export const paiseToRupees = (paise: number): number => Math.round(Number(paise || 0) / 100);
+
+export const formatINR = (rupees: number): string =>
+  `₹${Number(rupees || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 export interface GpProposal {
   id: string;
@@ -86,38 +108,11 @@ export async function isGrowthPartnerRole(
   client: SupabaseClient,
   userId: string,
 ): Promise<{ allowed: boolean; foundRole: string | null }> {
-  const GP_ROLES = new Set(['growth_partner', 'district_partner']);
-  try {
-    const { data, error } = await client
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const roles = data.map((r: any) => String(r.role));
-      const match = roles.find((r) => GP_ROLES.has(r));
-      if (match) return { allowed: true, foundRole: match };
-      return { allowed: false, foundRole: roles[0] ?? null };
-    }
-    // Query succeeded but user has no roles at all → definitively a
-    // non-partner account (e.g. plain customer), do not fall through.
-    if (!error) return { allowed: false, foundRole: null };
-  } catch {
-    // fall through to profiles check
-  }
-  try {
-    const { data, error } = await client
-      .from('profiles')
-      .select('platform_role')
-      .eq('id', userId)
-      .maybeSingle();
-    if (!error && data?.platform_role) {
-      const role = String(data.platform_role);
-      return { allowed: GP_ROLES.has(role), foundRole: role };
-    }
-  } catch {
-    // no role source available
-  }
-  return { allowed: false, foundRole: null };
+  // Login fails closed: only a definitive 'authorized' answer grants entry.
+  // Session restore uses checkGrowthPartnerAccess directly so 'unknown'
+  // (offline) can keep an already-authorized shell alive under RLS.
+  const result = await checkGrowthPartnerAccess(client, userId);
+  return { allowed: result.state === 'authorized', foundRole: result.foundRole };
 }
 
 export type PartnerAccessState = 'authorized' | 'denied' | 'unknown';
@@ -233,33 +228,18 @@ export async function fetchCommissionSummary(
 ): Promise<CommissionSummary> {
   const { data, error } = await client
     .from('growth_partner_commissions')
-    .select('commission_paise, status, hold_until')
+    .select('commission_paise, status, hold_until, created_at')
     .eq('growth_partner_id', partnerId)
     .order('hold_until', { ascending: true });
   if (error) {
     if (isMissingRelationError(error)) {
-      return {
-        heldPaise: 0,
-        payablePaise: 0,
-        paidPaise: 0,
-        heldCount: 0,
-        payableCount: 0,
-        paidCount: 0,
-        nextReleaseDate: null,
-      };
+      return emptyCommissionSummary();
     }
     throw error;
   }
 
-  const summary: CommissionSummary = {
-    heldPaise: 0,
-    payablePaise: 0,
-    paidPaise: 0,
-    heldCount: 0,
-    payableCount: 0,
-    paidCount: 0,
-    nextReleaseDate: null,
-  };
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const summary = emptyCommissionSummary();
   for (const row of data ?? []) {
     const amount = Number(row.commission_paise ?? 0);
     if (row.status === 'held') {
@@ -272,8 +252,12 @@ export async function fetchCommissionSummary(
     } else if (row.status === 'paid') {
       summary.paidPaise += amount;
       summary.paidCount += 1;
+    } else {
+      continue;
     }
-    // void / clawed_back are excluded — they never belong to the partner
+    summary.lifetimePaise += amount;
+    const created = row.created_at ? new Date(String(row.created_at)).getTime() : NaN;
+    if (Number.isFinite(created) && created >= weekAgo) summary.weekPaise += amount;
   }
   return summary;
 }
@@ -438,54 +422,86 @@ export async function submitShopApplication(
   const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error('Not authenticated.');
 
-  // 1. Resolve (or create) the partner identity row.
-  let partner = await resolveGrowthPartner(client, user.id);
+  // 1. Resolve the partner identity row. Do NOT invent one — growth_partners
+  // is provisioned by Nexora ops together with the permanent role.
+  const partner = await resolveGrowthPartner(client, user.id);
   if (!partner) {
-    const suffix = Math.random().toString(36).slice(2, 10).toUpperCase();
-    const { data: newPartner, error: partnerErr } = await client
-      .from('growth_partners')
-      .insert({
-        user_id: user.id,
-        partner_code: `NXR${suffix}`,
-        referral_code: `REF${suffix}`,
-        status: 'applied',
-      })
-      .select('id')
-      .single();
-    if (partnerErr) throw partnerErr;
-    partner = { id: newPartner.id, user_id: user.id };
+    throw new Error(
+      'No Growth Partner profile is linked to this account. Nexora ops must assign your partner record before you can onboard shops.',
+    );
   }
 
-  // 2. Create the onboarding application with server-side canonical linkage
-  const { data: app, error: appErr } = await client
-    .from('shop_onboarding_applications')
-    .insert({
-      submitted_by_partner_id: partner.id,
-      existing_salon_id: input.existingSalonId || null,
-      status: 'draft',
-      current_step: 6,
-      owner_email: input.ownerEmail.trim().toLowerCase(),
-      owner_phone: input.ownerPhone.trim(),
-      shop_name: input.shopName.trim(),
-      city: input.city.trim(),
-      locality: input.locality.trim(),
-      full_address: input.fullAddress.trim(),
-      opening_time: input.openingTime,
-      closing_time: input.closingTime,
-      about_shop: input.aboutShop.trim(),
-      website_template: input.websiteTemplate,
-    })
-    .select('id')
-    .single();
-  if (appErr) throw appErr;
+  const shopName = input.shopName.trim();
+  const ownerEmail = input.ownerEmail.trim().toLowerCase();
+  const applicationFields = {
+    submitted_by_partner_id: partner.id,
+    existing_salon_id: input.existingSalonId || null,
+    status: 'draft',
+    current_step: 6,
+    owner_email: ownerEmail,
+    owner_phone: input.ownerPhone.trim(),
+    shop_name: shopName,
+    city: input.city.trim(),
+    locality: input.locality.trim(),
+    full_address: input.fullAddress.trim(),
+    opening_time: input.openingTime,
+    closing_time: input.closingTime,
+    about_shop: input.aboutShop.trim(),
+    website_template: input.websiteTemplate,
+  };
+
+  // 2. Reuse an existing draft/submitted application for this shop instead of
+  // inserting a second row (duplicate existing_salon_id / shop_name).
+  let applicationId: string | null = null;
+  if (input.existingSalonId) {
+    const { data: existingBySalon } = await client
+      .from('shop_onboarding_applications')
+      .select('id')
+      .eq('submitted_by_partner_id', partner.id)
+      .eq('existing_salon_id', input.existingSalonId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (existingBySalon && existingBySalon.length > 0) {
+      applicationId = String(existingBySalon[0].id);
+    }
+  }
+  if (!applicationId && shopName) {
+    const { data: existingByName } = await client
+      .from('shop_onboarding_applications')
+      .select('id')
+      .eq('submitted_by_partner_id', partner.id)
+      .eq('shop_name', shopName)
+      .in('status', ['draft', 'submitted'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (existingByName && existingByName.length > 0) {
+      applicationId = String(existingByName[0].id);
+    }
+  }
+
+  if (applicationId) {
+    const { error: updErr } = await client
+      .from('shop_onboarding_applications')
+      .update(applicationFields)
+      .eq('id', applicationId);
+    if (updErr) throw updErr;
+  } else {
+    const { data: app, error: appErr } = await client
+      .from('shop_onboarding_applications')
+      .insert(applicationFields)
+      .select('id')
+      .single();
+    if (appErr) throw appErr;
+    applicationId = String(app.id);
+  }
 
   // 3. Save the website-setup proposal payload (validated & owner-resolved server-side)
   const payload = {
     profile: {
-      name: input.shopName.trim(),
+      name: shopName,
       description: input.aboutShop.trim(),
       phone: input.ownerPhone.trim(),
-      email: input.ownerEmail.trim().toLowerCase(),
+      email: ownerEmail,
       address: input.fullAddress.trim(),
       area: input.locality.trim(),
       city: input.city.trim(),
@@ -494,14 +510,15 @@ export async function submitShopApplication(
     services: input.services || [],
     template: { key: input.websiteTemplate },
   };
+  if (!applicationId) throw new Error('Could not create or reuse a shop application.');
   const { error: proposalErr } = await client.rpc('save_growth_partner_salon_setup', {
-    p_application_id: app.id,
+    p_application_id: applicationId,
     p_payload: payload,
     p_submit: true,
   });
   if (proposalErr) throw proposalErr;
 
-  return { applicationId: String(app.id) };
+  return { applicationId };
 }
 
 export interface SaveProposalInput {
