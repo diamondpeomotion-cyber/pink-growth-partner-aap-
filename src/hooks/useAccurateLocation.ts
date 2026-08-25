@@ -31,9 +31,11 @@ export function useAccurateLocation(): UseAccurateLocation {
   // A previously ACCEPTED fix survives page reloads (localStorage). It is
   // already accuracy-gated (<=30 m by construction), so it can be served as
   // 'locked' immediately until the watch reports a >100 m movement.
-  const initialFix = useRef<GeoReading | null>(readSavedFix());
-  const [status, setStatus] = useState<AccurateLocationStatus>(initialFix.current ? 'locked' : 'idle');
-  const [fix, setFix] = useState<GeoReading | null>(initialFix.current);
+  // (Lazy state initializer — the storage read is not a render-time ref
+  // access, keeping the react-hooks v7 refs rule satisfied.)
+  const [initialFix] = useState<GeoReading | null>(() => readSavedFix());
+  const [status, setStatus] = useState<AccurateLocationStatus>(initialFix ? 'locked' : 'idle');
+  const [fix, setFix] = useState<GeoReading | null>(initialFix);
   const [lastReading, setLastReading] = useState<GeoReading | null>(null);
   const [error, setError] = useState<LocationErrorInfo | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<LocationPermissionStatus>('unknown');

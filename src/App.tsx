@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSwipe } from './hooks/useSwipe';
 import { ArrowLeft } from 'lucide-react';
 import LoginForm from './components/LoginForm';
@@ -8,8 +8,17 @@ import TicketDetailsScreen from './components/dashboard/TicketDetailsScreen';
 import NewTicketScreen from './components/dashboard/NewTicketScreen';
 import HelpArticleScreen from './components/dashboard/HelpArticleScreen';
 import OfflineNotificationBanner from './components/OfflineNotificationBanner';
-import { supabase, supabaseConfigError, initialRecoveryLink } from './lib/supabaseClient';
+import {
+  supabase,
+  supabaseConfigError,
+  initialRecoveryLink,
+  initialRecoveryTokens,
+  clearAllAuthStorage,
+} from './lib/supabaseClient';
 import { checkGrowthPartnerAccess } from './lib/gpRepository';
+import { clearProtectedState } from './lib/protectedState';
+import { redirectToLogin, restoreFromLogin } from './lib/authRedirect';
+import { useLocationSync } from './hooks/useLocationSync';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
 
 // Heavy route-level screens are code-split so the initial bundle only carries
@@ -84,6 +93,29 @@ export const DEFAULT_DASHBOARD_CACHE = {
   offlinePendingActionsCount: 0,
 };
 
+/** Shown when a password-reset link is dead (expired / used / revoked). */
+const RECOVERY_LINK_EXPIRED_MESSAGE =
+  'This reset link is invalid, expired or was already used. Request a fresh one below.';
+
+type RecoveryState = 'none' | 'pending' | 'active' | 'invalid';
+
+/** Pure derivation of the recovery state from the URL captured at module
+ *  load (lib/supabase.ts). Shared by the lazy state + ref initializers so
+ *  they can never disagree. */
+const computeInitialRecoveryState = (): RecoveryState => {
+  if (!initialRecoveryLink.intent) return 'none';
+  if (initialRecoveryLink.error) return 'invalid';
+  if (!initialRecoveryTokens) return 'invalid';
+  return 'pending';
+};
+
+const computeInitialRecoveryError = (): string | null => {
+  if (!initialRecoveryLink.intent) return null;
+  if (initialRecoveryLink.error) return initialRecoveryLink.error;
+  if (!initialRecoveryTokens) return RECOVERY_LINK_EXPIRED_MESSAGE;
+  return null;
+};
+
 /** Lightweight placeholder shown while a code-split screen is downloading. */
 function ScreenLoader() {
   return (
@@ -102,39 +134,70 @@ export default function App() {
   // every session (fresh or restored) is authorized against the permanent
   // role stored in the database — never localStorage, URL or app state.
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
+  // No client means there is no session to restore — the auth gate is ready
+  // immediately (the config-error surface renders instead).
+  const [authReady, setAuthReady] = useState(() => supabase === null);
   const authVerifySeq = useRef(0);
+  // Last user we authorized — its per-user caches are wiped by
+  // clearProtectedState(userId) when the session disappears (see
+  // lib/protectedState.ts: dashboard cache, partner profile, shop draft,
+  // selected-shop + GPS fix caches — the full nexora_* inventory).
+  const authorizedUserIdRef = useRef<string | null>(null);
+
+  // Wipe the signed-out user's protected caches and drop the id reference.
+  const clearProtectedStateForCurrentUser = () => {
+    clearProtectedState(authorizedUserIdRef.current);
+    authorizedUserIdRef.current = null;
+  };
 
   // ---- Password recovery (Phase 3) ----
   // 'pending'  = a recovery link was opened, waiting for Supabase to verify it
   // 'active'   = Supabase accepted the recovery token (PASSWORD_RECOVERY)
   // 'invalid'  = link expired/used/revoked (or carried an error) — no reset
-  type RecoveryState = 'none' | 'pending' | 'active' | 'invalid';
-  const [recovery, setRecovery] = useState<RecoveryState>('none');
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
-  const recoveryRef = useRef<RecoveryState>('none');
-  const setRecoveryBoth = (v: RecoveryState) => {
+  // Initial recovery state is DERIVED from the synchronously-captured URL
+  // (lib/supabase.ts) — lazy initializers only, so no setState-in-effect.
+  // The ref mirrors the same derivation so the role gate can never run
+  // against a recovery session (a Customer must be able to reset too).
+  const [recovery, setRecovery] = useState<RecoveryState>(computeInitialRecoveryState);
+  const [recoveryError, setRecoveryError] = useState<string | null>(computeInitialRecoveryError);
+  const recoveryRef = useRef<RecoveryState>(computeInitialRecoveryState());
+  const setRecoveryBoth = useCallback((v: RecoveryState) => {
     recoveryRef.current = v;
     setRecovery(v);
-  };
+  }, []);
 
   useEffect(() => {
-    if (!supabase) {
-      setAuthReady(true);
-      return;
-    }
+    if (!supabase) return;
     const client = supabase;
     let cancelled = false;
 
     // Recovery-link state was captured synchronously at module load (before
-    // supabase-js consumed/stripped the URL hash) — see lib/supabaseClient.
-    if (initialRecoveryLink.error) {
-      setRecoveryError(initialRecoveryLink.error);
-      setRecoveryBoth('invalid');
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (initialRecoveryLink.intent) {
-      setRecoveryBoth('pending');
-      window.history.replaceState({}, '', window.location.pathname);
+    // supabase-js consumed/stripped the URL hash) — see lib/supabase.ts.
+    // PKCE client + recovery links: the hash tokens are captured at module
+    // load and the URL already stripped, so re-establish the recovery session
+    // on the SAME client via auth.setSession() (server-validated: expired /
+    // revoked links land in 'invalid'). All state updates below are async
+    // continuations — never synchronous setState in the effect body.
+    if (initialRecoveryLink.intent && !initialRecoveryLink.error && initialRecoveryTokens) {
+      void client.auth
+        .setSession({
+          access_token: initialRecoveryTokens.access_token,
+          refresh_token: initialRecoveryTokens.refresh_token,
+        })
+        .then(({ error }) => {
+          if (cancelled) return;
+          if (error) {
+            setRecoveryError(RECOVERY_LINK_EXPIRED_MESSAGE);
+            setRecoveryBoth('invalid');
+            return;
+          }
+          setRecoveryBoth('active');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setRecoveryError(RECOVERY_LINK_EXPIRED_MESSAGE);
+          setRecoveryBoth('invalid');
+        });
     }
 
     const applySession = async (session: import('@supabase/supabase-js').Session | null) => {
@@ -145,12 +208,45 @@ export default function App() {
       const seq = ++authVerifySeq.current;
       if (!session?.user) {
         if (!cancelled) {
+          clearProtectedStateForCurrentUser();
           setIsLoggedIn(false);
           setAuthReady(true);
         }
         return;
       }
-      const check = await checkGrowthPartnerAccess(client, session.user.id);
+
+      // Server-side token validation. A session that still sits in storage
+      // but is invalid/expired/revoked on the server must clear protected
+      // state and return to login. Transient failures (offline) keep the
+      // session — RLS still enforces every query server-side.
+      let userId = session.user.id;
+      try {
+        const { data: checkedUser, error: userError } = await client.auth.getUser();
+        if (userError) {
+          const definitiveRejection =
+            userError.name === 'AuthSessionMissingError' ||
+            (typeof (userError as { status?: number }).status === 'number' &&
+              ((userError as { status?: number }).status === 401 ||
+                (userError as { status?: number }).status === 403)) ||
+            /invalid|expired|revoked|not found/i.test(userError.message ?? '');
+          if (definitiveRejection) {
+            await client.auth.signOut({ scope: 'local' }).catch(() => {});
+            if (!cancelled && seq === authVerifySeq.current) {
+              clearProtectedStateForCurrentUser();
+              setIsLoggedIn(false);
+              setAuthReady(true);
+            }
+            return;
+          }
+        } else if (checkedUser.user) {
+          userId = checkedUser.user.id;
+        }
+      } catch {
+        // Network-level throw — treat as transient, keep the session.
+      }
+      if (cancelled || seq !== authVerifySeq.current) return;
+
+      const check = await checkGrowthPartnerAccess(client, userId);
       if (cancelled || seq !== authVerifySeq.current) return;
       if (check.state === 'denied') {
         // Authenticated but not authorized for this app (e.g. a Customer
@@ -161,6 +257,7 @@ export default function App() {
         await client.auth.signOut({ scope: 'global' }).catch(() => {});
         await client.auth.signOut({ scope: 'local' }).catch(() => {});
         if (!cancelled) {
+          clearProtectedStateForCurrentUser();
           setIsLoggedIn(false);
           setAuthReady(true);
         }
@@ -168,6 +265,7 @@ export default function App() {
       }
       // 'authorized' → enter. 'unknown' (offline/transient failure) → keep
       // the session: RLS still enforces every query server-side.
+      authorizedUserIdRef.current = userId;
       setIsLoggedIn(true);
       setAuthReady(true);
     };
@@ -176,9 +274,9 @@ export default function App() {
       .getSession()
       .then(({ data }) => {
         if (cancelled) return;
-        // Race fix: PASSWORD_RECOVERY may have fired before React subscribed
-        // (supabase-js processes the hash at client creation). If a recovery
-        // link is pending and a session already exists, it IS the recovery
+        // Race fix: the recovery session may have been established before
+        // React subscribed (setSession completes early). If a recovery link
+        // is pending and a session already exists, it IS the recovery
         // session — unlock the form.
         if (recoveryRef.current === 'pending' && data.session) {
           setRecoveryBoth('active');
@@ -189,9 +287,33 @@ export default function App() {
       .catch(() => {
         if (!cancelled) setAuthReady(true);
       });
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' && session) {
         setRecoveryBoth('active');
+        return;
+      }
+      // SIGNED_OUT / USER_DELETED: session is gone (logout, expiry, revoke,
+      // failed refresh). Clear protected state and land on /auth/login.
+      // (USER_DELETED is compared as a widened string: newer auth-js versions
+      // emit it, the installed one does not yet expose it in the union.)
+      if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
+        clearProtectedStateForCurrentUser();
+        setIsLoggedIn(false);
+        setAuthReady(true);
+        return;
+      }
+      // TOKEN_REFRESHED: a successful refresh keeps the existing authorized
+      // state; a refresh that produced NO session means the session expired
+      // and could not be renewed → treat exactly like SIGNED_OUT.
+      if (event === 'TOKEN_REFRESHED') {
+        if (session) {
+          setAuthReady(true);
+        } else {
+          clearProtectedStateForCurrentUser();
+          setIsLoggedIn(false);
+          setAuthReady(true);
+        }
         return;
       }
       void applySession(session);
@@ -200,7 +322,22 @@ export default function App() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [setRecoveryBoth]);
+
+  // URL contract: signed OUT → /auth/login; signed IN → leave /auth/*.
+  // Both transitions are replaceState-based (lib/authRedirect.ts), so the
+  // effect can never re-trigger itself — no redirect loops.
+  useEffect(() => {
+    if (!authReady) return;
+    if (isLoggedIn) restoreFromLogin();
+    else redirectToLogin();
+  }, [authReady, isLoggedIn]);
+
+  // Nexora authenticated location synchronization. Inert unless signed in
+  // (and not mid password-recovery). The hook owns the single background GPS
+  // watcher and stops it on SIGNED_OUT/unmount — see hooks/useLocationSync.
+  useLocationSync({ enabled: isLoggedIn && authReady && recovery === 'none' });
+
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [history, setHistory] = useState<string[]>(['dashboard']);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -321,7 +458,9 @@ export default function App() {
       if (supabase) {
         void supabase.auth.signOut({ scope: 'global' }).catch(() => {});
         void supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        clearAllAuthStorage();
       }
+      clearProtectedStateForCurrentUser();
       setRecoveryBoth('none');
       setRecoveryError(null);
       setIsLoggedIn(false);

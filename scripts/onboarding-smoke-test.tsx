@@ -20,7 +20,12 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 const g = globalThis as any;
 g.window = dom.window;
 g.document = dom.window.document;
-g.navigator = dom.window.navigator;
+// Node 22 exposes `navigator` as a getter-only global — defineProperty it.
+Object.defineProperty(g, 'navigator', {
+  value: dom.window.navigator,
+  configurable: true,
+  writable: true,
+});
 g.HTMLElement = dom.window.HTMLElement;
 g.Element = dom.window.Element;
 g.Node = dom.window.Node;

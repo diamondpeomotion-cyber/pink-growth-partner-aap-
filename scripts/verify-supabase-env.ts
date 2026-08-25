@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { createServer, loadEnv } from 'vite';
 
-import { validateSupabaseConfig } from '../src/lib/supabaseClient';
+import { validateSupabaseConfig, buildNexoraClient } from '../src/lib/supabaseClient';
 
 // Node 20 has no global WebSocket; supabase-js v2.112 requires one at
 // construction time. Browsers always have it, so this shim exists ONLY so the
@@ -142,8 +142,10 @@ console.log('\n[4] createClient() initialisation');
 let client: ReturnType<typeof createClient> | null = null;
 if (config.isValid) {
   try {
-    client = createClient(config.url, config.anonKey, { auth: { flowType: 'implicit' } });
-    ok('Supabase client initialised (auth.flowType="implicit", same options as the app)');
+    // Use the app's OWN client factory so this check always exercises the
+    // exact production auth options (PKCE, Nexora storage key, persist+refresh).
+    client = buildNexoraClient(config.url, config.anonKey);
+    ok('Supabase client initialised via buildNexoraClient (flowType="pkce", Nexora storage key — same as the app)');
     info(`client.auth present: ${Boolean(client.auth)} | client.from present: ${typeof client.from === 'function'}`);
   } catch (error) {
     bad(`createClient threw: ${(error as Error).message}`);

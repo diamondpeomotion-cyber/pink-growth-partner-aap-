@@ -177,16 +177,23 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [capturedLocation, setCapturedLocation] = useState<GeoReading | null>(
     () => (draft as { capturedLocation?: GeoReading }).capturedLocation ?? null,
   );
+  // NOTE: these state updates are deferred by a microtask. The geo engine
+  // (useAccurateLocation) is an external event source, not render state, so
+  // synchronizing into React state from the effect is intentional — the
+  // deferral keeps the update out of the effect's render cascade (react-hooks
+  // v7 set-state-in-effect) without changing any behaviour.
   useEffect(() => {
     if (geo.fix) {
       // Saved per requirement: latitude, longitude, accuracy, timestamp.
-      setCapturedLocation(geo.fix);
-      setLocationDetected(true);
-      setIsDetectingLocation(false);
+      queueMicrotask(() => {
+        setCapturedLocation(geo.fix);
+        setLocationDetected(true);
+        setIsDetectingLocation(false);
+      });
     }
   }, [geo.fix]);
   useEffect(() => {
-    if (geo.error) setIsDetectingLocation(false);
+    if (geo.error) queueMicrotask(() => setIsDetectingLocation(false));
   }, [geo.error]);
   
   const [stateName, setStateName] = useState(() => draft.stateName ?? 'Rajasthan');

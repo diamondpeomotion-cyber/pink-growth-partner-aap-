@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Lock, AlertCircle, CheckCircle2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -37,7 +37,9 @@ export default function ResetPasswordScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fieldError, setFieldError] = useState('');
-  const mountedAt = useRef(Date.now());
+  // Mount time captured in a lazy initializer (impure call only in the
+  // initializer, never during render) — used to expire 'checking' screens.
+  const [mountedAt] = useState(() => Date.now());
 
   // Recovery session watch: Supabase fires PASSWORD_RECOVERY when the link's
   // tokens are accepted. If the event was consumed before this screen
@@ -75,7 +77,11 @@ export default function ResetPasswordScreen({
         .catch(() => {});
     };
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' && session && !settled) {
+      // PASSWORD_RECOVERY = legacy direct-hash consumption;
+      // SIGNED_IN = the recovery session established via auth.setSession()
+      // (PKCE client — see lib/supabase.ts). Either way, while this screen
+      // owns the UI the arriving session IS the recovery session.
+      if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session && !settled) {
         settleWithServerCheck();
       }
     });
@@ -95,12 +101,17 @@ export default function ResetPasswordScreen({
   }, [initialError]);
 
   // App-level verification finished and still no recovery session → invalid.
+  // The state transition is deferred by a microtask so the effect never sets
+  // state synchronously (react-hooks v7 set-state-in-effect); behaviour is
+  // unchanged.
   useEffect(() => {
-    if (!verifying && view === 'checking' && Date.now() - mountedAt.current > 1500) {
-      setErrorText('This reset link is invalid, expired or was already used. Request a fresh one.');
-      setView('invalid');
+    if (!verifying && view === 'checking' && Date.now() - mountedAt > 1500) {
+      queueMicrotask(() => {
+        setErrorText('This reset link is invalid, expired or was already used. Request a fresh one.');
+        setView('invalid');
+      });
     }
-  }, [verifying, view]);
+  }, [verifying, view, mountedAt]);
 
   const score = (val: string) => ({
     minLength: val.length >= 6,
