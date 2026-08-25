@@ -325,79 +325,10 @@ export default function RewardsScreen({
           </div>
         </section>
 
-        {/* Milestone Tracker Sandbox Area */}
-        <section className="bg-white rounded-3xl p-5 shadow-xs border border-gray-200/60 space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1">
-                <TrendingUp size={13} className="text-primary" /> Reward Milestones Simulator
-              </h3>
-              <p className="text-[10px] text-gray-400 font-bold block mt-0.5">Test targets and verify payouts</p>
-            </div>
-            <button
-              onClick={() => setShowOnboardShop(true)}
-              className="bg-primary hover:bg-pink-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus size={11} /> <span>Add Shop</span>
-            </button>
-          </div>
-
-          {/* Quick interactive sliders to change the count and instantly test state validations */}
-          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3.5">
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[11px] font-bold text-gray-700">
-                <span>Set Qualifying Shops (Simulation)</span>
-                <span className="text-primary font-black">{qualifyingCount} Shops</span>
-              </div>
-              <input
-                type="range"
-                min="240"
-                max="255"
-                value={qualifyingCount}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  setQualifyingCount(val);
-                  if (val === 250) {
-                    triggerToast('🏆 Milestone 250 completed! 1 more shop to claim scooter!');
-                  } else if (val >= 251) {
-                    triggerToast('🎁 Congratulation! You can now tap Claim Scooter Reward!');
-                  }
-                }}
-                className="w-full accent-primary cursor-pointer h-2 bg-gray-200 rounded-lg"
-              />
-              <p className="text-[9.5px] text-gray-400 font-medium">Drag to simulate onboarding verification flows between 240 and 255 shops.</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-              <button 
-                onClick={() => {
-                  setQualifyingCount(247);
-                  triggerToast('🔄 Reset simulation back to default (247)');
-                }}
-                className="bg-white border border-gray-200 rounded-xl py-1.5 font-bold hover:bg-gray-50 active:scale-95 cursor-pointer text-gray-600"
-              >
-                Reset Default
-              </button>
-              <button 
-                onClick={() => {
-                  setQualifyingCount(250);
-                  triggerToast('⭐ Advanced progress to 250 (Milestone Complete)');
-                }}
-                className="bg-white border border-gray-200 rounded-xl py-1.5 font-bold hover:bg-gray-50 active:scale-95 cursor-pointer text-gray-600"
-              >
-                Set 250
-              </button>
-              <button 
-                onClick={() => {
-                  setQualifyingCount(251);
-                  triggerToast('🔥 Unlocked Claim Scooter Reward (251)');
-                }}
-                className="bg-white border border-gray-200 rounded-xl py-1.5 font-bold hover:bg-gray-50 active:scale-95 cursor-pointer text-gray-600"
-              >
-                Set 251
-              </button>
-            </div>
-          </div>
+        <section className="bg-white rounded-3xl p-5 shadow-xs border border-gray-200/60">
+          <p className="text-xs text-gray-600 font-medium">
+            Progress is the live count of attributed shops with status <strong>active</strong>. There is no simulator and shops cannot be qualified from this screen.
+          </p>
         </section>
 
         {/* Recently onboarded verification status lists */}
@@ -606,7 +537,7 @@ export default function RewardsScreen({
                     : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                Verified Active ({allShops.filter(s => s.status === 'Verified').length + 243})
+                Verified Active ({allShops.filter(s => s.status === 'Verified').length})
               </button>
               <button
                 onClick={() => setModalTab('Pending')}
@@ -770,14 +701,14 @@ export default function RewardsScreen({
             </div>
 
             <p className="text-xs text-gray-600 leading-normal font-semibold">
-              Congratulations Rajesh! Your portfolio has hit <span className="text-primary font-black">{qualifyingCount} verified qualifying shops</span>. Select your claim payout preference below:
+              Your portfolio has hit <span className="text-primary font-black">{qualifyingCount} attributed active shops</span>. Claim requests are recorded locally until Nexora ops processes them:
             </p>
 
             <div className="space-y-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => {
-                  triggerToast('🛵 Choice registered: Electric Scooter! Shipment verification sent.');
+                  triggerToast('Choice noted on this device. Fulfilment is processed by Nexora ops, not this app.');
                   setShowClaimModal(false);
                 }}
                 className="w-full py-3 px-4 bg-primary text-white rounded-2xl text-xs font-bold shadow-xs hover:bg-pink-700 active:scale-98 text-center cursor-pointer flex justify-center items-center gap-1"
@@ -788,7 +719,7 @@ export default function RewardsScreen({
               <button
                 type="button"
                 onClick={() => {
-                  triggerToast('💰 Choice registered: ₹90,000 Cash Equivalent! direct bank settlement pending.');
+                  triggerToast('Choice noted on this device. No bank transfer was initiated.');
                   setShowClaimModal(false);
                 }}
                 className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold hover:bg-emerald-100 active:scale-98 text-center cursor-pointer flex justify-center items-center gap-1"

@@ -175,19 +175,20 @@ export default function MyShopsScreen({
     shop?: Shop;
   } | null>(null);
 
-  // Tab configurations
-  const tabs = [
-    { label: 'All', count: 270, value: 'All' },
-    { label: 'Qualifying', count: 247, value: 'Qualifying' },
-    { label: 'Under Review', count: 4, value: 'Under Review' },
-    { label: 'Need Changes', count: 2, value: 'Need Changes' },
-    { label: 'KYC Pending', count: 4, value: 'KYC Pending' },
-    { label: 'QR Not Active', count: 3, value: 'QR Not Active' },
-    { label: '15-Day Cycle', count: 3, value: '15-Day Cycle' },
-    { label: 'Daily Target Failed', count: 2, value: 'Daily Target Failed' },
-    { label: 'Draft', count: 5, value: 'Draft' },
-    { label: 'Rejected', count: 5, value: 'Rejected' }
-  ];
+  const tabs = useMemo(() => {
+    const countFor = (value: string) =>
+      value === 'All' ? shops.length : shops.filter((s) => s.status === value).length;
+    return [
+      { label: 'All', value: 'All' },
+      { label: 'Passed', value: 'Passed' },
+      { label: 'Under Review', value: 'Under Review' },
+      { label: 'Need Changes', value: 'Need Changes' },
+      { label: 'KYC Pending', value: 'KYC Pending' },
+      { label: 'QR Not Active', value: 'QR Not Active' },
+      { label: 'Draft', value: 'Draft' },
+      { label: 'Rejected', value: 'Rejected' },
+    ].map((t) => ({ ...t, count: countFor(t.value) }));
+  }, [shops]);
 
   // Filtering & Sorting Logic
   const filteredShops = useMemo(() => {
@@ -287,11 +288,8 @@ export default function MyShopsScreen({
   };
 
   const handleBulkDelete = () => {
-    const count = selectedShopIds.length;
-    setShops(prev => prev.filter(s => !selectedShopIds.includes(s.id)));
-    setSelectedShopIds([]);
     setShowBulkDeleteConfirm(false);
-    setToastMsg(`Successfully deleted ${count} shop(s).`);
+    setToastMsg('Shops cannot be deleted from this app. Attribution is owned by the server.');
     setTimeout(() => setToastMsg(null), 4000);
   };
 
@@ -326,30 +324,9 @@ export default function MyShopsScreen({
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  const handleBulkStatusUpdate = (newStatus: Shop['status']) => {
-    const count = selectedShopIds.length;
-    setShops(prev => prev.map(s => {
-      if (selectedShopIds.includes(s.id)) {
-        let displayStat = newStatus as string;
-        if (newStatus === 'Passed') displayStat = 'Passed';
-        else if (newStatus === 'Daily Target Failed') displayStat = 'Failed';
-        else if (newStatus === 'Qualifying') displayStat = 'Qualifying';
-        else if (newStatus === 'QR Not Active') displayStat = 'Inactive';
-        else if (newStatus === 'Need Changes') displayStat = 'Needs Fix';
-        else if (newStatus === 'Under Review') displayStat = 'Reviewing';
-        
-        return {
-          ...s,
-          status: newStatus,
-          displayStatus: displayStat
-        };
-      }
-      return s;
-    }));
-
-    setSelectedShopIds([]);
+  const handleBulkStatusUpdate = (_newStatus: Shop['status']) => {
     setShowBulkStatusModal(false);
-    setToastMsg(`Updated status to "${newStatus}" for ${count} shop(s).`);
+    setToastMsg('Shop status is owned by shop_attributions on the server and cannot be changed from this list.');
     setTimeout(() => setToastMsg(null), 4000);
   };
 
@@ -368,7 +345,7 @@ export default function MyShopsScreen({
           </button>
           <div className="flex flex-col">
             <h1 className="text-base font-extrabold text-primary tracking-tight">Nexora Growth</h1>
-            <span className="text-[10px] text-gray-400 font-semibold uppercase">GP-JPR-1024</span>
+            <span className="text-[10px] text-gray-400 font-semibold uppercase">{shops.length} attributed</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -527,23 +504,23 @@ export default function MyShopsScreen({
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Onboarded</span>
-            <span className="text-2xl font-black text-gray-900 mt-1">270</span>
+            <span className="text-2xl font-black text-gray-900 mt-1">{shops.length}</span>
           </div>
           <div className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Verified Shops</span>
-            <span className="text-2xl font-black text-emerald-600 mt-1">250</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active</span>
+            <span className="text-2xl font-black text-emerald-600 mt-1">{shops.filter((s) => s.status === 'Passed').length}</span>
           </div>
           <div className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Qualifying</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Under review</span>
             <div className="flex items-end gap-1 mt-1">
-              <span className="text-2xl font-black text-primary">247</span>
+              <span className="text-2xl font-black text-primary">{shops.filter((s) => s.status === 'Under Review').length}</span>
               <Star size={14} className="text-primary fill-primary mb-1.5 shrink-0" />
             </div>
           </div>
           <div className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Need Action</span>
-            <span className="text-2xl font-black text-red-500 mt-1 ml-1">11</span>
+            <span className="text-2xl font-black text-red-500 mt-1 ml-1">{shops.filter((s) => s.status !== 'Passed').length}</span>
           </div>
         </div>
 

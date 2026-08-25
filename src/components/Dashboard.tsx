@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getItem } from '../utils/db';
 import { supabase } from '../lib/supabaseClient';
 import {
   resolveGrowthPartner,
   fetchMyAttributions,
   fetchCommissionSummary,
+  fetchMyProposals,
+  paiseToRupees,
+  emptyCommissionSummary,
 } from '../lib/gpRepository';
 
 import DashboardHeader from './dashboard/DashboardHeader';
@@ -22,11 +24,16 @@ import { Plus } from 'lucide-react';
 import GrowthTip from './dashboard/GrowthTip';
 
 export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyncing = false }: { onLogout: () => void, onNavigate: (page: string) => void, isOnline?: boolean, isSyncing?: boolean }) {
-  // Live figures from the shared Supabase project (replaces the hardcoded
-  // demo values + localStorage/IndexedDB cache).
   const [currentShops, setCurrentShops] = useState(0);
   const [totalShops, setTotalShops] = useState(0);
   const [availableAmount, setAvailableAmount] = useState(0);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [weekAmount, setWeekAmount] = useState(0);
+  const [lifetimeAmount, setLifetimeAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [nextPayoutDate, setNextPayoutDate] = useState<string | null>(null);
+  const [draftCount, setDraftCount] = useState(0);
+  const [topShopName, setTopShopName] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState('Growth Partner');
 
   useEffect(() => {
@@ -46,22 +53,30 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
             | undefined;
           if (name) setPartnerName(String(name));
 
-          const [attributions, summary] = await Promise.all([
+          const [attributions, summary, proposals] = await Promise.all([
             fetchMyAttributions(supabase, String(partner.id)),
             fetchCommissionSummary(supabase, String(partner.id)),
+            fetchMyProposals(supabase, String(partner.id)),
           ]);
           if (cancelled) return;
           const active = attributions.filter((a) => a.status === 'active');
           setCurrentShops(active.length);
           setTotalShops(attributions.length);
-          // "Available" = commissions released from the 7-day hold (payable).
-          setAvailableAmount(Math.round(summary.payablePaise / 100));
+          setAvailableAmount(paiseToRupees(summary.payablePaise));
+          setPendingAmount(paiseToRupees(summary.heldPaise));
+          setWeekAmount(paiseToRupees(summary.weekPaise));
+          setLifetimeAmount(paiseToRupees(summary.lifetimePaise));
+          setPaidAmount(paiseToRupees(summary.paidPaise));
+          setNextPayoutDate(summary.nextReleaseDate);
+          setDraftCount(proposals.filter((p) => p.status === 'draft' || p.status === 'changes_requested').length);
+          setTopShopName(active[0]?.salon_name ?? attributions[0]?.salon_name ?? null);
           return;
         }
 
-        // No growth_partners row yet — fall back to the auth profile name.
         const metaName = user.user_metadata?.full_name;
         if (metaName) setPartnerName(String(metaName));
+        const empty = emptyCommissionSummary();
+        setAvailableAmount(paiseToRupees(empty.payablePaise));
       } catch (err) {
         console.warn('Failed to load live dashboard data:', err);
       }
@@ -71,12 +86,11 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
       cancelled = true;
     };
   }, []);
-  
+
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100 overflow-x-hidden">
-      <DashboardHeader onLogout={onLogout} onNavigate={onNavigate} isOnline={isOnline} isSyncing={isSyncing} />
+      <DashboardHeader partnerName={partnerName} onLogout={onLogout} onNavigate={onNavigate} isOnline={isOnline} isSyncing={isSyncing} />
       <main className="flex-1 w-full pt-4 pb-16 px-[var(--page-margin)] max-w-screen-xl mx-auto space-y-5">
-        {/* Partner Header */}
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 sm:px-6 py-1">
             <div className="flex flex-col">
                 <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Growth Partner</p>
@@ -88,24 +102,41 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
 
         <QuickActionsGrid onNavigate={onNavigate} />
 
-        {/* Existing components structured according to new layout */}
-        <EarningsCard currentShops={currentShops} totalShops={totalShops} availableAmount={availableAmount} onNavigate={onNavigate} />
-        
-        <DetailedAnalytics />
+        <EarningsCard
+          currentShops={currentShops}
+          totalShops={totalShops}
+          availableAmount={availableAmount}
+          pendingAmount={pendingAmount}
+          weekAmount={weekAmount}
+          lifetimeAmount={lifetimeAmount}
+          nextPayoutDate={nextPayoutDate}
+          onNavigate={onNavigate}
+        />
+
+        <DetailedAnalytics
+          lifetimeAmount={lifetimeAmount}
+          weekAmount={weekAmount}
+          shopCount={totalShops}
+          topShopName={topShopName}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ShopsNeedingAction onNavigate={onNavigate} />
-            <PerformanceChart />
+            <PerformanceChart
+              payableAmount={availableAmount}
+              heldAmount={pendingAmount}
+              paidAmount={paidAmount}
+            />
         </div>
-        
-        <TaskCalendar />
+
+        <TaskCalendar draftCount={draftCount} />
 
         <QuickActions onNavigate={onNavigate} />
         <CompletedRewards onNavigate={onNavigate} />
       </main>
-      
+
       <div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full pointer-events-none flex justify-end px-5 z-40 max-w-screen-xl mx-auto">
-        <button 
+        <button
           onClick={() => onNavigate('add-shop')}
           className="pointer-events-auto bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center">
           <Plus size={24} />

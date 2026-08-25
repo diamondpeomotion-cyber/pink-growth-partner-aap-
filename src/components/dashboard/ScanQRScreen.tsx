@@ -1,102 +1,95 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Camera, CheckCircle2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Camera } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+import { resolveGrowthPartner, fetchMyAttributions } from '../../lib/gpRepository';
 
 export default function ScanQRScreen({ onBack }: { onBack: () => void }) {
-  const [scanning, setScanning] = useState(true);
-  const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [result, setResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleSimulateScan = (code: string) => {
-    setScanning(false);
-    setScannedCode(code);
+  const lookup = async (code: string) => {
+    const needle = code.trim();
+    if (!needle) return;
+    if (!supabase) {
+      setResult('Supabase is not configured.');
+      return;
+    }
+    setBusy(true);
+    setResult(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setResult('Sign in required.');
+        return;
+      }
+      const partner = await resolveGrowthPartner(supabase, user.id);
+      if (!partner) {
+        setResult('No Growth Partner profile is linked to this account.');
+        return;
+      }
+      const rows = await fetchMyAttributions(supabase, String(partner.id));
+      const match = rows.find(
+        (r) =>
+          String(r.salon_id) === needle ||
+          String(r.id) === needle ||
+          (r.salon_name || '').toLowerCase() === needle.toLowerCase(),
+      );
+      if (match) {
+        setResult(`Matched attributed shop: ${match.salon_name || match.salon_id} (${match.status}).`);
+      } else {
+        setResult('No attributed shop matches that code. Camera scanning is not wired to a decoder in this build.');
+      }
+    } catch (err) {
+      setResult(err instanceof Error ? err.message : 'Lookup failed.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#fcf9f8] text-[#1b1c1b] pb-24">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm h-16 flex items-center justify-between px-5">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={onBack}
             className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-pink-50 text-primary transition-colors"
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-lg font-bold text-primary">Scan Shop QR Code</h1>
+          <h1 className="text-lg font-bold text-primary">Look up shop</h1>
         </div>
       </header>
 
       <main className="max-w-screen-xl mx-auto px-[var(--page-margin)] pt-8 space-y-6">
-        {scanning ? (
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
-            <div className="w-64 h-64 bg-gray-900 rounded-2xl relative overflow-hidden flex items-center justify-center shadow-inner mb-6">
-              <div className="absolute inset-0 border-2 border-primary/50 animate-pulse rounded-2xl m-4"></div>
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 animate-bounce"></div>
-              <Camera size={48} className="text-white/40 mb-2" />
-              <p className="text-xs text-white/70 absolute bottom-4">Align QR code within frame</p>
-            </div>
-
-            <p className="text-sm text-gray-600 mb-4">Point your camera at the merchant QR code to verify or register.</p>
-
-            <div className="flex gap-3 w-full">
-              <button 
-                onClick={() => handleSimulateScan('SHOP-JAIPUR-8842')}
-                className="flex-1 bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-md text-sm"
-              >
-                Simulate Successful Scan
-              </button>
-            </div>
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
+          <div className="w-24 h-24 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+            <Camera size={36} className="text-gray-400" />
           </div>
-        ) : (
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-green-100 text-success rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 size={32} />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">QR Code Verified!</h2>
-            <p className="text-sm text-gray-500 mb-6 font-mono bg-gray-50 px-3 py-1 rounded-lg">{scannedCode}</p>
+          <p className="text-sm text-gray-600 mb-2">
+            Camera QR decoding is not enabled in this build. Look up a shop by salon id, attribution id, or exact shop name from your attributed list.
+          </p>
+        </div>
 
-            <div className="bg-pink-50 rounded-2xl p-4 w-full text-left mb-6">
-              <h3 className="font-semibold text-primary text-sm mb-1">Nexora Salon</h3>
-              <p className="text-xs text-gray-600">Mansarovar, Jaipur • Status: Active Partner</p>
-            </div>
-
-            <div className="flex gap-3 w-full">
-              <button 
-                onClick={() => setScanning(true)}
-                className="flex-1 border border-gray-200 py-3 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm"
-              >
-                <RefreshCw size={16} /> Scan Another
-              </button>
-              <button 
-                onClick={onBack}
-                className="flex-1 bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-md text-sm"
-              >
-                Done / Back
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Manual Code Input */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-900 mb-2 text-sm">Or Enter Shop Code Manually</h3>
+          <h3 className="font-bold text-gray-900 mb-2 text-sm">Shop code or name</h3>
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="e.g. SHOP-1024"
+            <input
+              type="text"
+              placeholder="salon id or shop name"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
               className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary"
             />
-            <button 
-              onClick={() => {
-                if (manualCode) handleSimulateScan(manualCode);
-              }}
-              className="bg-primary text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors"
+            <button
+              disabled={busy}
+              onClick={() => void lookup(manualCode)}
+              className="bg-primary text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60"
             >
-              Verify
+              {busy ? 'Looking…' : 'Look up'}
             </button>
           </div>
+          {result && <p className="text-xs text-gray-700 mt-3 font-medium">{result}</p>}
         </div>
       </main>
     </div>

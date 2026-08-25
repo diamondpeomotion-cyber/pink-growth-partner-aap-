@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import { supabase } from '../../lib/supabaseClient';
-import { resolveGrowthPartner, fetchMyAttributions, fetchCommissionEntries, fetchMyPayouts } from '../../lib/gpRepository';
+import { resolveGrowthPartner, fetchMyAttributions, fetchCommissionEntries, fetchMyPayouts, fetchCommissionSummary, paiseToRupees } from '../../lib/gpRepository';
 
 interface ShopEarning {
   id: string;
@@ -49,9 +49,11 @@ export default function QREarningsScreen({
   onBack?: () => void;
 }) {
   // Available state
-  const [availableAmount, setAvailableAmount] = useState(8400);
-  const [pendingAmount, setPendingAmount] = useState(3250);
-  const [lifetimeAmount, setLifetimeAmount] = useState(72450);
+  const [availableAmount, setAvailableAmount] = useState(0);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [lifetimeAmount, setLifetimeAmount] = useState(0);
+  const [weekAmount, setWeekAmount] = useState(0);
+  const [nextRelease, setNextRelease] = useState<string | null>(null);
   
   const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
 
@@ -90,12 +92,18 @@ export default function QREarningsScreen({
         if (!user || cancelled) return;
         const partner = await resolveGrowthPartner(supabase, user.id);
         if (!partner || cancelled) return;
-        const [attribs, commissions, payoutRows] = await Promise.all([
+        const [attribs, commissions, payoutRows, summary] = await Promise.all([
           fetchMyAttributions(supabase, String(partner.id)),
           fetchCommissionEntries(supabase, String(partner.id)),
           fetchMyPayouts(supabase, String(partner.id)),
+          fetchCommissionSummary(supabase, String(partner.id)),
         ]);
         if (cancelled) return;
+        setAvailableAmount(paiseToRupees(summary.payablePaise));
+        setPendingAmount(paiseToRupees(summary.heldPaise));
+        setLifetimeAmount(paiseToRupees(summary.lifetimePaise));
+        setWeekAmount(paiseToRupees(summary.weekPaise));
+        setNextRelease(summary.nextReleaseDate);
         setShops(attribs.map((a) => ({
           id: String(a.id),
           name: a.salon_name ?? 'Shop',
@@ -213,12 +221,12 @@ export default function QREarningsScreen({
                 <span className="text-xs font-black text-gray-700">₹{pendingAmount.toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Current Week</span>
-                <span className="text-xs font-black text-gray-700">₹6,800</span>
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Last 7 days</span>
+                <span className="text-xs font-black text-gray-700">₹{weekAmount.toLocaleString('en-IN')}</span>
               </div>
               <div>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Current Month</span>
-                <span className="text-xs font-black text-gray-700">₹12,450</span>
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Paid (lifetime)</span>
+                <span className="text-xs font-black text-gray-700">₹{Math.max(0, lifetimeAmount - availableAmount - pendingAmount).toLocaleString('en-IN')}</span>
               </div>
               <div>
                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Lifetime Earnings</span>
@@ -232,7 +240,7 @@ export default function QREarningsScreen({
                 <Clock size={14} className="text-gray-400" />
                 <div>
                   <span className="text-[9px] text-gray-400 block font-bold uppercase">Next Automatic Settlement</span>
-                  <span className="font-extrabold text-gray-800">04 Aug 2026 <span className="font-semibold text-gray-500">(Weekly Tuesday Cycle)</span></span>
+                  <span className="font-extrabold text-gray-800">{nextRelease ? new Date(nextRelease).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No held commissions'}</span>
                 </div>
               </div>
             </div>

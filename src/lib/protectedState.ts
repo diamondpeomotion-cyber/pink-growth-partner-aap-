@@ -75,6 +75,10 @@ export const clearProtectedState = (userId: string | null = null): void => {
     for (const key of NEXORA_PROTECTED_LOCAL_KEYS) {
       window.localStorage.removeItem(key);
     }
+    // Per-shop website drafts (nexora_website_onboarding:<uid>:<salonId>).
+    for (const key of readAllKeys(window.localStorage)) {
+      if (key.startsWith('nexora_website_onboarding:')) window.localStorage.removeItem(key);
+    }
   } catch {
     /* ignore */
   }

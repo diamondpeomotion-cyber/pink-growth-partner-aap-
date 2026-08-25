@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { resolveGrowthPartner, fetchMyPayouts } from '../../lib/gpRepository';
+import { resolveGrowthPartner, fetchMyPayouts, fetchCommissionSummary, paiseToRupees, formatINR } from '../../lib/gpRepository';
 import {
   ArrowLeft,
   HelpCircle,
@@ -50,6 +50,9 @@ export default function PayoutsScreen({
 
   // New simulated history
   const [historyItems, setHistoryItems] = useState<PayoutStatusItem[]>([]);
+  const [payableRupees, setPayableRupees] = useState(0);
+  const [heldRupees, setHeldRupees] = useState(0);
+  const [nextRelease, setNextRelease] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,8 +63,14 @@ export default function PayoutsScreen({
         if (!user || cancelled) return;
         const partner = await resolveGrowthPartner(supabase, user.id);
         if (!partner || cancelled) { setHistoryItems([]); return; }
-        const rows = await fetchMyPayouts(supabase, String(partner.id));
+        const [rows, summary] = await Promise.all([
+          fetchMyPayouts(supabase, String(partner.id)),
+          fetchCommissionSummary(supabase, String(partner.id)),
+        ]);
         if (cancelled) return;
+        setPayableRupees(paiseToRupees(summary.payablePaise));
+        setHeldRupees(paiseToRupees(summary.heldPaise));
+        setNextRelease(summary.nextReleaseDate);
         setHistoryItems(rows.map((p) => ({
           id: p.id,
           type: 'Payout',
@@ -88,9 +97,9 @@ export default function PayoutsScreen({
 
   const handleUpdateBank = (e: React.FormEvent) => {
     e.preventDefault();
-    triggerToast('🏦 Bank credentials updated! Standard IMPS test initiated.');
+    triggerToast('Bank details are stored only on this device until the payout pipeline is enabled. No IMPS test was sent.');
     setShowManageBankModal(false);
-    setIsVerified(true);
+    setIsVerified(false);
   };
 
   return (
@@ -159,19 +168,19 @@ export default function PayoutsScreen({
           <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-xs border-t border-gray-100 pt-4 mb-4">
             <div>
               <span className="text-gray-400 font-bold block mb-0.5">Payout Date</span>
-              <span className="font-extrabold text-gray-800">04 Aug 2026</span>
+              <span className="font-extrabold text-gray-800">{nextRelease ? new Date(nextRelease).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-bold block mb-0.5">Current Cycle</span>
-              <span className="font-extrabold text-gray-800">27 Jul – 02 Aug</span>
+              <span className="text-gray-400 font-bold block mb-0.5">Hold window</span>
+              <span className="font-extrabold text-gray-800">7 days</span>
             </div>
             <div>
-              <span className="text-gray-400 font-bold block mb-0.5">Available Earnings</span>
-              <span className="font-extrabold text-emerald-600">₹8,400</span>
+              <span className="text-gray-400 font-bold block mb-0.5">Available (payable)</span>
+              <span className="font-extrabold text-emerald-600">{formatINR(payableRupees)}</span>
             </div>
             <div>
-              <span className="text-gray-400 font-bold block mb-0.5">Pending Audit</span>
-              <span className="font-extrabold text-amber-500">₹3,250</span>
+              <span className="text-gray-400 font-bold block mb-0.5">Held</span>
+              <span className="font-extrabold text-amber-500">{formatINR(heldRupees)}</span>
             </div>
 
             <div className="col-span-2 pt-1">
@@ -200,22 +209,18 @@ export default function PayoutsScreen({
           </h3>
           <div className="space-y-3.5 text-xs">
             <div className="flex justify-between items-center">
-              <span className="text-gray-400 font-bold">Opening Balance</span>
-              <span className="font-extrabold text-gray-700">₹5,600</span>
+              <span className="text-gray-400 font-bold">Held commissions</span>
+              <span className="font-extrabold text-gray-700">{formatINR(heldRupees)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 font-bold flex items-center gap-1">
-                New Verified QR Scans <CheckCircle2 size={11} className="text-emerald-500 stroke-[3px]" />
+                Payable (hold released) <CheckCircle2 size={11} className="text-emerald-500 stroke-[3px]" />
               </span>
-              <span className="font-extrabold text-emerald-600">+₹3,100</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 font-bold">Disbursement Adjustments</span>
-              <span className="font-extrabold text-red-500">-₹300</span>
+              <span className="font-extrabold text-emerald-600">{formatINR(payableRupees)}</span>
             </div>
             <div className="pt-3.5 mt-3.5 border-t border-gray-100 flex justify-between items-center">
-              <span className="font-black text-gray-900">Estimated Tuesday Payout</span>
-              <span className="font-black text-base text-[#b90064]">₹8,400</span>
+              <span className="font-black text-gray-900">Ready for payout run</span>
+              <span className="font-black text-base text-[#b90064]">{formatINR(payableRupees)}</span>
             </div>
           </div>
         </section>
@@ -284,21 +289,13 @@ export default function PayoutsScreen({
               <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Not Included Yet</h3>
               <p className="text-[10px] text-gray-400 font-bold mt-0.5">Pending daily verification</p>
             </div>
-            <span className="font-black text-base text-amber-500">₹3,250</span>
+            <span className="font-black text-base text-amber-500">{formatINR(heldRupees)}</span>
           </div>
 
           <div className="space-y-2 mb-4">
             <div className="bg-gray-50 rounded-2xl p-3 flex justify-between items-center border border-gray-100 text-xs">
-              <span className="font-bold text-gray-500">UPI Settlement Hold</span>
-              <span className="font-extrabold text-gray-800">₹1,850</span>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-3 flex justify-between items-center border border-gray-100 text-xs">
-              <span className="font-bold text-gray-500">Customer Refund Checks</span>
-              <span className="font-extrabold text-gray-800">₹900</span>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-3 flex justify-between items-center border border-gray-100 text-xs">
-              <span className="font-bold text-gray-500">New Shop qualification lock</span>
-              <span className="font-extrabold text-gray-800">₹500</span>
+              <span className="font-bold text-gray-500">7-day hold on commissions</span>
+              <span className="font-extrabold text-gray-800">{formatINR(heldRupees)}</span>
             </div>
           </div>
 
@@ -466,7 +463,7 @@ export default function PayoutsScreen({
               </div>
 
               <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-[10.5px] text-amber-800 leading-normal font-medium">
-                🔒 Verification process deposits ₹1.00 via IMPS immediately to confirm account activation.
+                Bank details are not written to Supabase from this screen yet. Payouts are created only by the server-side pipeline.
               </div>
 
               <button

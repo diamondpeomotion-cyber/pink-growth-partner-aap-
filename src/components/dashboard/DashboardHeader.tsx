@@ -89,32 +89,16 @@ export default function DashboardHeader({
   onLogout, 
   onNavigate, 
   isOnline = true, 
-  isSyncing: externalSyncing = false 
+  isSyncing: externalSyncing = false,
+  partnerName = 'Nexora Partner',
 }: { 
   onLogout: () => void, 
   onNavigate?: (page: string) => void, 
   isOnline?: boolean, 
-  isSyncing?: boolean 
+  isSyncing?: boolean,
+  partnerName?: string,
 }) {
-  const [partnerName] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem('nexora_partner_profile');
-      return saved ? JSON.parse(saved)?.name ?? 'Nexora Partner' : 'Nexora Partner';
-    } catch {
-      return 'Nexora Partner';
-    }
-  });
-
-  const [profileImage] = useState<string | null>(() => {
-    try {
-      const saved = localStorage.getItem('nexora_partner_profile');
-      if (!saved) return null;
-      const profile = JSON.parse(saved);
-      return profile?.profileImage ?? null;
-    } catch {
-      return null;
-    }
-  });
+  const profileImage: string | null = null;
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [showSyncDetailsModal, setShowSyncDetailsModal] = useState(false);
   

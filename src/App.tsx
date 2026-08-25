@@ -72,24 +72,13 @@ const SCREENS_WITH_OWN_BACK_BUTTON = new Set([
  */
 const FULL_HEIGHT_SCREENS = new Set(['website-onboarding']);
 
-export const DEFAULT_PARTNER_PROFILE = {
-  name: 'Rahul Verma',
-  mobile: '9876543210',
-  email: 'rahul.verma@nexoragrowth.in',
-  agentCode: 'NX-RJ-8842',
-  city: 'Jaipur, Rajasthan',
-  upiId: 'rahulverma@okaxis',
-  joinedDate: '15 Jan 2024',
-  status: 'Active Partner'
-};
-
 export const DEFAULT_DASHBOARD_CACHE = {
-  availableAmount: 8400,
-  qualifyingShopsCount: 250,
-  totalShopsCount: 250,
-  monthlyEarnings: 42500,
-  pendingPayouts: 1800,
-  lastSyncTime: new Date().toISOString(),
+  availableAmount: 0,
+  qualifyingShopsCount: 0,
+  totalShopsCount: 0,
+  monthlyEarnings: 0,
+  pendingPayouts: 0,
+  lastSyncTime: null as string | null,
   offlinePendingActionsCount: 0,
 };
 
@@ -357,14 +346,15 @@ export default function App() {
       
       // Update persistent storage cache on online sync
       try {
-        const cache = localStorage.getItem('nexora_dashboard_cache');
-        const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
-        const updatedCache = {
-          ...parsedCache,
-          lastSyncTime: new Date().toISOString(),
-        };
-        localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
         localStorage.setItem('nexora_last_sync_timestamp', new Date().toISOString());
+        const cache = localStorage.getItem('nexora_dashboard_cache');
+        if (cache) {
+          const parsedCache = JSON.parse(cache);
+          localStorage.setItem(
+            'nexora_dashboard_cache',
+            JSON.stringify({ ...parsedCache, lastSyncTime: new Date().toISOString() }),
+          );
+        }
       } catch (e) {
         console.error('Failed updating cache on network status change:', e);
       }
@@ -390,13 +380,15 @@ export default function App() {
         if (event.data && event.data.type === 'SYNC_COMPLETE') {
           setIsSyncing(false);
           try {
+            localStorage.setItem('nexora_last_sync_timestamp', new Date().toISOString());
             const cache = localStorage.getItem('nexora_dashboard_cache');
-            const parsedCache = cache ? JSON.parse(cache) : DEFAULT_DASHBOARD_CACHE;
-            const updatedCache = {
-              ...parsedCache,
-              lastSyncTime: new Date().toISOString(),
-            };
-            localStorage.setItem('nexora_dashboard_cache', JSON.stringify(updatedCache));
+            if (cache) {
+              const parsedCache = JSON.parse(cache);
+              localStorage.setItem(
+                'nexora_dashboard_cache',
+                JSON.stringify({ ...parsedCache, lastSyncTime: new Date().toISOString() }),
+              );
+            }
           } catch (e) {
             console.error('Failed syncing cache on broadcast:', e);
           }

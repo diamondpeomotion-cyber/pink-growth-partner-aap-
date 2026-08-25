@@ -88,18 +88,8 @@ export default function GrowthTip() {
         </div>
       </div>
       
-      <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
-        <div className="flex -space-x-1">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="w-5 h-5 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
-               <img src={`https://i.pravatar.cc/150?u=${i + 10}`} alt="avatar" className="w-full h-full object-cover" />
-            </div>
-          ))}
-          <div className="w-5 h-5 rounded-full border-2 border-white bg-primary flex items-center justify-center text-[8px] font-bold text-white">
-            +42
-          </div>
-        </div>
-        <span className="text-[10px] font-bold text-gray-400">42 partners used this tip today</span>
+      <div className="mt-4 pt-3 border-t border-gray-50">
+        <span className="text-[10px] font-bold text-gray-400">General practice tip — not a live usage count</span>
       </div>
     </motion.section>
   );

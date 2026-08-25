@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { copyToClipboard } from '../../utils/clipboard';
 import { supabase } from '../../lib/supabaseClient';
-import { updatePartnerProfile } from '../../lib/gpRepository';
+import { updatePartnerProfile, resolveGrowthPartner } from '../../lib/gpRepository';
 import Avatar from '../Avatar';
 import { toPng } from 'html-to-image';
 import BottomNav from './BottomNav';
@@ -49,6 +49,9 @@ export default function ProfileScreen({
     address: '',
     alternateMobile: '',
     profileImage: '',
+    partnerCode: '',
+    city: '',
+    joinedDate: '',
   });
 
   useEffect(() => {
@@ -60,17 +63,23 @@ export default function ProfileScreen({
         if (!user || cancelled) return;
         const { data: row } = await supabase
           .from('profiles')
-          .select('full_name, phone, avatar_path')
+          .select('full_name, phone, avatar_path, city, created_at')
           .eq('id', user.id)
           .maybeSingle();
+        const partner = await resolveGrowthPartner(supabase, user.id);
         setProfile({
           name: row?.full_name || user.user_metadata?.full_name || '',
           dob: '',
-          mobile: row?.phone || user.phone || '',
+          mobile: row?.phone || user.phone || user.user_metadata?.mobile || '',
           email: user.email || '',
           address: '',
           alternateMobile: '',
           profileImage: '',
+          partnerCode: (partner?.partner_code as string) || '',
+          city: (partner?.city as string) || row?.city || user.user_metadata?.city || '',
+          joinedDate: user.created_at
+            ? new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : '',
         });
       } catch (err) {
         console.warn('Profile load failed:', err);
@@ -367,16 +376,16 @@ export default function ProfileScreen({
                 <p className="text-sm text-[#5a3f47] mb-2 font-medium">Growth Partner</p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-[#2E7D32] text-xs font-bold mb-6">
                   <CheckCircle size={14} className="text-emerald-600" />
-                  Active (Verified KYC)
+                  Signed-in Growth Partner
                 </div>
                 <div className="w-full grid grid-cols-2 gap-4 text-left border-t border-gray-100 pt-4 mb-6">
                   <div>
                     <p className="text-[11px] text-[#5a3f47] uppercase tracking-wider mb-1 font-bold">Partner ID</p>
-                    <p className="text-[13px] text-[#1b1c1b] font-extrabold">GP-JPR-1024</p>
+                    <p className="text-[13px] text-[#1b1c1b] font-extrabold">{profile.partnerCode || 'Not assigned'}</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-[#5a3f47] uppercase tracking-wider mb-1 font-bold">Territory</p>
-                    <p className="text-[13px] text-[#1b1c1b] font-extrabold">Jaipur District</p>
+                    <p className="text-[13px] text-[#1b1c1b] font-extrabold">{profile.city || 'Not set'}</p>
                   </div>
                 </div>
                 <div className="flex gap-3 w-full">
@@ -586,7 +595,7 @@ export default function ProfileScreen({
                 <div className="flex items-center gap-3">
                   <h3 className="text-[18px] font-bold text-[#1b1c1b]">KYC &amp; Documents</h3>
                   <div className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#2E7D32] text-[10px] font-extrabold flex items-center gap-1">
-                    <CheckCircle size={11} className="text-emerald-600" /> Verified
+                    <CheckCircle size={11} className="text-emerald-600" /> Not stored here
                   </div>
                 </div>
                 <button 
@@ -612,7 +621,7 @@ export default function ProfileScreen({
                   </div>
                   <div>
                     <p className="text-[10px] text-[#5a3f47] uppercase tracking-wider font-bold mb-0.5">PAN Card</p>
-                    <p className="text-sm font-extrabold text-[#1b1c1b] tracking-wider font-mono">ABCDE****F</p>
+                    <p className="text-sm font-extrabold text-[#1b1c1b] tracking-wider font-mono">Not on file</p>
                   </div>
                 </div>
                 <div 
@@ -627,7 +636,7 @@ export default function ProfileScreen({
                   </div>
                   <div>
                     <p className="text-[10px] text-[#5a3f47] uppercase tracking-wider font-bold mb-0.5">Aadhaar Card</p>
-                    <p className="text-sm font-extrabold text-[#1b1c1b] tracking-wider font-mono">XXXX XXXX 4582</p>
+                    <p className="text-sm font-extrabold text-[#1b1c1b] tracking-wider font-mono">Not on file</p>
                   </div>
                 </div>
               </div>
@@ -899,7 +908,7 @@ export default function ProfileScreen({
                                   Mobile
                                 </span>
                                 <span className="text-white/95 font-medium block text-[10px]">
-                                  {profile.mobile || '+91 98321 45678'}
+{profile.mobile || 'Not on file'}
                                 </span>
                               </div>
                             </div>
@@ -907,7 +916,7 @@ export default function ProfileScreen({
                             <div className="flex items-center gap-2 pt-0.5 text-[10px] text-amber-100/90 font-medium">
                               <span className="bg-white/10 px-1.5 py-0.5 rounded border border-white/10">Growth Partner</span>
                               <span>•</span>
-                              <span className="truncate">Jaipur District</span>
+                              <span className="truncate">{profile.city || 'Not set'}</span>
                             </div>
                           </div>
                         </div>
@@ -919,7 +928,7 @@ export default function ProfileScreen({
                               Partner ID / Smart Card No.
                             </span>
                             <span className="font-mono text-xs sm:text-sm font-black tracking-widest text-amber-200 drop-shadow-sm">
-                              GP-JPR-1024
+                              {profile.partnerCode || 'UNASSIGNED'}
                             </span>
                           </div>
 
@@ -928,7 +937,7 @@ export default function ProfileScreen({
                               Member Since
                             </span>
                             <span className="text-[10px] sm:text-[11px] font-bold text-white">
-                              15 Jan 2026
+                              {profile.joinedDate || '—'}
                             </span>
                           </div>
                         </div>
@@ -949,7 +958,7 @@ export default function ProfileScreen({
                               <span className="text-[10px] font-mono not-italic text-gray-500 font-bold">AUTH SIGN</span>
                             </div>
                             <div className="bg-amber-200 text-[#6b003a] px-2.5 py-1.5 sm:py-2 rounded-lg font-mono font-black text-xs shadow-md border border-amber-300">
-                              CVV: 1024
+                              ID card — not a payment card
                             </div>
                           </div>
 
@@ -971,7 +980,7 @@ export default function ProfileScreen({
                         {/* Footer Logo & Verification Disclaimer */}
                         <div className="flex items-center justify-between text-[9px] text-amber-200/70 border-t border-white/10 pt-1.5">
                           <span>NEXORA NETWORK PVT LTD</span>
-                          <span className="font-mono">PARTNER ID: GP-JPR-1024</span>
+                          <span className="font-mono">PARTNER ID: {profile.partnerCode || 'UNASSIGNED'}</span>
                         </div>
                       </div>
                     )}
@@ -1012,7 +1021,7 @@ export default function ProfileScreen({
                       <div className="w-full space-y-2.5 text-center mb-1 border-t border-gray-100 pt-4 text-xs">
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-gray-500 font-medium">Partner ID</span>
-                          <span className="font-mono font-extrabold text-[#1b1c1b]">GP-JPR-1024</span>
+                          <span className="font-mono font-extrabold text-[#1b1c1b]">{profile.partnerCode || 'UNASSIGNED'}</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-gray-500 font-medium">Email</span>
@@ -1020,7 +1029,7 @@ export default function ProfileScreen({
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-gray-500 font-medium">Mobile</span>
-                          <span className="font-bold text-[#1b1c1b]">{profile.mobile || '+91 98321 45678'}</span>
+                          <span className="font-bold text-[#1b1c1b]">{profile.mobile || 'Not on file'}</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-gray-500 font-medium">Role</span>
@@ -1028,11 +1037,11 @@ export default function ProfileScreen({
                         </div>
                         <div className="flex justify-between py-1 border-b border-gray-100">
                           <span className="text-gray-500 font-medium">Territory</span>
-                          <span className="font-bold text-[#1b1c1b]">Jaipur District</span>
+                          <span className="font-bold text-[#1b1c1b]">{profile.city || 'Not set'}</span>
                         </div>
                         <div className="flex justify-between py-1">
                           <span className="text-gray-500 font-medium">Member Since</span>
-                          <span className="font-bold text-[#1b1c1b]">15 Jan 2026</span>
+                          <span className="font-bold text-[#1b1c1b]">{profile.joinedDate || '—'}</span>
                         </div>
                       </div>
                     </div>
@@ -1086,12 +1095,12 @@ export default function ProfileScreen({
                     <button 
                       type="button"
                       onClick={async () => {
-                        const shareUrl = `https://glowbeauty.nexora.shop/verify/GP-JPR-1024?name=${encodeURIComponent(profile.name)}&email=${encodeURIComponent(profile.email)}`;
+                        const shareUrl = profile.partnerCode ? `${window.location.origin}/?partner=${encodeURIComponent(profile.partnerCode)}` : window.location.origin;
                         if (navigator.share) {
                           try {
                             await navigator.share({
                               title: `${profile.name} - Nexora Growth Partner ATM Card`,
-                              text: `Verified Nexora Growth Partner ID: GP-JPR-1024 (${profile.name}) - ${profile.email}`,
+                              text: `Nexora Growth Partner ${profile.partnerCode || ''} (${profile.name}) - ${profile.email}`,
                               url: shareUrl,
                             });
                             triggerToast('Digital ID card shared successfully!');
@@ -1104,7 +1113,7 @@ export default function ProfileScreen({
                         triggerToast(
                           copied
                             ? 'Partner Card verification link copied to clipboard!'
-                            : 'Partner ID: GP-JPR-1024'
+                            : `Partner ID: ${profile.partnerCode || 'unassigned'}`
                         );
                       }}
                       className="flex-1 h-12 rounded-xl bg-[#FDE7F3] text-[#b90064] text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FDE7F3]/80 transition-all cursor-pointer active:scale-98"
@@ -1166,7 +1175,7 @@ export default function ProfileScreen({
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500 font-medium">Partner ID</span>
-                    <span className="font-mono font-bold text-gray-900">GP-JPR-1024</span>
+                    <span className="font-mono font-bold text-gray-900">{profile.partnerCode || 'UNASSIGNED'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500 font-medium">Partner Name</span>
@@ -1178,16 +1187,16 @@ export default function ProfileScreen({
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500 font-medium">Territory</span>
-                    <span className="font-semibold text-gray-900">Jaipur District</span>
+                    <span className="font-semibold text-gray-900">{profile.city || 'Not set'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500 font-medium">Mobile Number</span>
-                    <span className="font-bold text-gray-900">{profile.mobile || '+91 98321 45678'}</span>
+                    <span className="font-bold text-gray-900">{profile.mobile || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-gray-100">
                     <span className="text-gray-500 font-medium">Encoded Payload</span>
                     <span className="font-mono text-[10px] text-primary truncate max-w-[180px]">
-                      https://glowbeauty.nexora.shop/verify/GP-JPR-1024
+                      {profile.partnerCode || 'unassigned'}
                     </span>
                   </div>
                 </div>
@@ -1195,7 +1204,7 @@ export default function ProfileScreen({
                 <div className="pt-2 flex gap-2">
                   <button
                     onClick={async () => {
-                      const url = `https://glowbeauty.nexora.shop/verify/GP-JPR-1024?name=${encodeURIComponent(profile.name)}`;
+                      const url = profile.partnerCode || 'unassigned';
                       const copied = await copyToClipboard(url);
                       triggerToast(
                         copied
@@ -1363,7 +1372,7 @@ export default function ProfileScreen({
               <div className="space-y-1">
                 <h3 className="text-base font-extrabold text-red-600 tracking-tight">Terminate Partner Account?</h3>
                 <p className="text-xs text-gray-500 leading-normal font-semibold">
-                  Warning! This action is <span className="font-bold text-red-500">irreversible</span>. You will permanently lose access to GP-JPR-1024, all referring shop commissions, and cumulative milestone claims.
+                  Warning! This action is <span className="font-bold text-red-500">irreversible</span>. You will permanently lose access to this partner account, attributed shops, and commissions.
                 </p>
               </div>
 
@@ -1441,7 +1450,7 @@ export default function ProfileScreen({
                     {kycDoc === 'pan' ? 'Permanent Account Number' : 'Aadhaar Unique ID'}
                   </span>
                   <span className="text-base font-extrabold text-gray-800 tracking-widest font-mono">
-                    {kycDoc === 'pan' ? 'ABCDE1482F' : '3841 8592 4582'}
+                    Not on file in this app
                   </span>
                 </div>
 
@@ -1460,7 +1469,7 @@ export default function ProfileScreen({
               <div className="bg-emerald-50/70 p-3 rounded-2xl border border-emerald-100/50 text-[10.5px] text-emerald-800 leading-normal font-semibold flex items-start gap-2">
                 <CheckCircle size={15} className="text-emerald-700 shrink-0 mt-0.5" />
                 <span>
-                  This document has been securely validated with NSDL &amp; UIDAI systems during partner registration and KYC verification.
+                  PAN and Aadhaar numbers are not stored in the Growth Partner app. KYC is handled by Nexora ops, not this screen.
                 </span>
               </div>
 
