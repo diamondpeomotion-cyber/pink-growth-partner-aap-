@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import {
   resolveGrowthPartner,
@@ -18,10 +18,15 @@ import CompletedRewards from './dashboard/CompletedRewards';
 import PerformanceChart from './dashboard/PerformanceChart';
 import BottomNav from './dashboard/BottomNav';
 import TaskCalendar from './dashboard/TaskCalendar';
-import DetailedAnalytics from './dashboard/DetailedAnalytics';
 import { Plus } from 'lucide-react';
 
 import GrowthTip from './dashboard/GrowthTip';
+
+// DetailedAnalytics is the ONLY consumer of the heavy `recharts` dependency
+// (~360 kB). Lazy-load it so recharts is code-split into its own dynamic chunk
+// and no longer part of the eagerly-preloaded first-paint graph. The Suspense
+// fallback keeps the dashboard layout stable while the chart module downloads.
+const DetailedAnalytics = lazy(() => import('./dashboard/DetailedAnalytics'));
 
 export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyncing = false }: { onLogout: () => void, onNavigate: (page: string) => void, isOnline?: boolean, isSyncing?: boolean }) {
   const [currentShops, setCurrentShops] = useState(0);
@@ -113,12 +118,14 @@ export default function Dashboard({ onLogout, onNavigate, isOnline = true, isSyn
           onNavigate={onNavigate}
         />
 
-        <DetailedAnalytics
-          lifetimeAmount={lifetimeAmount}
-          weekAmount={weekAmount}
-          shopCount={totalShops}
-          topShopName={topShopName}
-        />
+        <Suspense fallback={null}>
+          <DetailedAnalytics
+            lifetimeAmount={lifetimeAmount}
+            weekAmount={weekAmount}
+            shopCount={totalShops}
+            topShopName={topShopName}
+          />
+        </Suspense>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ShopsNeedingAction onNavigate={onNavigate} />

@@ -15,11 +15,17 @@ export default defineConfig(() => {
       // Split the heavy third-party libraries out of the app bundle. Previously
       // everything landed in one ~1.3 MB chunk that had to be downloaded before
       // the first paint.
+      //
+      // NOTE: recharts is intentionally NOT listed here. It is only consumed by
+      // DetailedAnalytics, which is React.lazy()-loaded from the dashboard, so it
+      // must live inside that lazy chunk rather than a named manual chunk. Adding
+      // it here would force Vite to treat the charts chunk as part of the initial
+      // preload graph, re-adding ~360 kB of recharts to the first-paint critical
+      // path despite the lazy import.
       rollupOptions: {
         output: {
           manualChunks: {
             react: ['react', 'react-dom'],
-            charts: ['recharts'],
             motion: ['motion'],
             icons: ['lucide-react'],
           },
