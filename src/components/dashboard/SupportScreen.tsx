@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -16,16 +16,8 @@ import {
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import CancellationPolicyModal from '../CancellationPolicyModal';
-
-interface Ticket {
-  id: string;
-  title: string;
-  status: 'In Progress' | 'Under Review' | 'Resolved';
-  lastUpdated: string;
-  type: 'warning' | 'tertiary' | 'success';
-}
-
-const ACTIVE_TICKETS: Ticket[] = [];
+import { supabase } from '../../lib/supabaseClient';
+import { fetchMyTickets, createSupportTicket, type SupportTicket } from '../../lib/supportRepository';
 
 const HELP_TOPICS = [
   { id: 'onboarding', label: 'Shop Onboarding', icon: Store },
@@ -55,17 +47,73 @@ export default function SupportScreen({
   const [showSuccess, setShowSuccess] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
 
+  // Real support-ticket state (supabase support_tickets)
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsLoaded, setTicketsLoaded] = useState(false);
+  const [category, setCategory] = useState('payouts');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [newTicketId, setNewTicketId] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  // Load the signed-in user's tickets once.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const rows = await fetchMyTickets(supabase, user.id);
+        if (!cancelled) setTickets(rows);
+      } catch {
+        if (!cancelled) triggerToast('Could not load your tickets.');
+      } finally {
+        if (!cancelled) setTicketsLoaded(true);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setSubmitError('Supabase is not configured.');
+      return;
+    }
+    if (!subject.trim()) {
+      setSubmitError('Please provide a subject.');
+      return;
+    }
     setIsSubmitting(true);
-    setIsSubmitting(false);
-    setShowSuccess(false);
-    triggerToast('Support tickets are not stored on the server from this screen yet. Email Nexora ops instead.');
+    setSubmitError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sign in required.');
+      const { id } = await createSupportTicket(supabase, {
+        userId: user.id,
+        subject,
+        description,
+        category: category || undefined,
+        priority,
+      });
+      setNewTicketId(id);
+      setShowSuccess(true);
+      // Refresh the ticket list so the new ticket appears immediately.
+      const rows = await fetchMyTickets(supabase, user.id);
+      setTickets(rows);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit ticket.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -191,39 +239,42 @@ export default function SupportScreen({
                 exit={{ opacity: 0, y: -10 }}
                 className="flex flex-col gap-4"
               >
-                {ACTIVE_TICKETS.length === 0 && (
-                  <p className="text-xs text-gray-500 font-medium">No support tickets are stored for this account in this app.</p>
+                {ticketsLoaded && tickets.length === 0 && (
+                  <p className="text-xs text-gray-500 font-medium">No support tickets yet. Create one from the New Request tab.</p>
                 )}
-                {ACTIVE_TICKETS.map((ticket) => (
-                  <div 
-                    key={ticket.id}
-                    onClick={() => onViewTicket?.(ticket.id)}
-                    className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3 transition-transform active:scale-[0.98] cursor-pointer hover:border-pink-100"
-                  >
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                      ticket.status === 'Resolved' ? 'bg-emerald-500' : 'bg-amber-500'
-                    }`}></div>
-                    
-                    <div className="flex justify-between items-start pl-2">
-                      <div className="space-y-1 text-left">
-                        <h3 className="text-sm font-bold text-[#1b1c1b] tracking-tight">{ticket.title}</h3>
-                        <p className="text-xs font-medium text-gray-500">Reward Tracking Issue</p>
+                {tickets.map((ticket) => {
+                  const isResolved = ticket.status === 'resolved' || ticket.status === 'closed';
+                  return (
+                    <div 
+                      key={ticket.id}
+                      onClick={() => onViewTicket?.(ticket.id)}
+                      className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3 transition-transform active:scale-[0.98] cursor-pointer hover:border-pink-100"
+                    >
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                        isResolved ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}></div>
+                      
+                      <div className="flex justify-between items-start pl-2">
+                        <div className="space-y-1 text-left min-w-0">
+                          <h3 className="text-sm font-bold text-[#1b1c1b] tracking-tight truncate">{ticket.subject}</h3>
+                          <p className="text-xs font-medium text-gray-500 capitalize">{ticket.category || 'General'}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                          isResolved 
+                            ? 'bg-emerald-50 text-emerald-600' 
+                            : 'bg-amber-50 text-amber-600'
+                        }`}>
+                          {ticket.status.replace('_', ' ')}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        ticket.status === 'Resolved' 
-                          ? 'bg-emerald-50 text-emerald-600' 
-                          : 'bg-amber-50 text-amber-600'
-                      }`}>
-                        {ticket.status}
-                      </span>
+                      
+                      <div className="pl-2 pt-3 border-t border-gray-50 flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        <span>{ticket.id.slice(0, 8).toUpperCase()}</span>
+                        <span>{ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                      </div>
                     </div>
-                    
-                    <div className="pl-2 pt-3 border-t border-gray-50 flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      <span>{ticket.id}</span>
-                      <span>{ticket.lastUpdated}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </motion.div>
             )}
 
@@ -240,10 +291,16 @@ export default function SupportScreen({
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Issue Category</label>
                       <div className="relative">
-                        <select className="w-full h-14 rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] px-4 appearance-none cursor-pointer">
-                          <option>Reward Claim</option>
-                          <option>Payout Issue</option>
-                          <option>App Bug</option>
+                        <select
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                          className="w-full h-14 rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] px-4 appearance-none cursor-pointer"
+                        >
+                          <option value="rewards">Reward Claim</option>
+                          <option value="payouts">Payout Issue</option>
+                          <option value="tech">App Bug</option>
+                          <option value="onboarding">Shop Onboarding</option>
+                          <option value="other">Other</option>
                         </select>
                         <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-gray-400 pointer-events-none" size={16} />
                       </div>
@@ -252,9 +309,12 @@ export default function SupportScreen({
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subject</label>
                       <input 
-                        type="text" 
+                        type="text"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
                         placeholder="Brief summary of issue"
-                        className="w-full h-14 rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] px-4" 
+                        className="w-full h-14 rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] px-4"
+                        required
                       />
                     </div>
                     
@@ -262,9 +322,28 @@ export default function SupportScreen({
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Problem Description</label>
                       <textarea 
                         rows={4}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                         placeholder="Detailed explanation..."
                         className="w-full rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] p-4 resize-none"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Priority</label>
+                      <div className="relative">
+                        <select
+                          value={priority}
+                          onChange={(e) => setPriority(e.target.value)}
+                          className="w-full h-14 rounded-2xl bg-gray-50 border-transparent focus:border-[#b90064] focus:ring-0 font-bold text-xs text-[#1b1c1b] px-4 appearance-none cursor-pointer"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-gray-400 pointer-events-none" size={16} />
+                      </div>
                     </div>
 
                     <div className="border-2 border-dashed border-gray-100 rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2 bg-gray-50/50 cursor-pointer hover:bg-gray-100 transition-colors group">
@@ -272,9 +351,13 @@ export default function SupportScreen({
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Tap to upload files</p>
                     </div>
 
+                    {submitError && (
+                      <p className="text-[11px] font-bold text-rose-600 text-center -mt-2">{submitError}</p>
+                    )}
                     <div className="flex gap-3 pt-2">
                       <button 
                         type="button"
+                        onClick={() => triggerToast('Draft mode is not available here yet. Submit your request to save it.')}
                         className="flex-1 h-14 rounded-2xl bg-pink-50 text-[#b90064] text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all cursor-pointer"
                       >
                         Save Draft
@@ -301,7 +384,7 @@ export default function SupportScreen({
                     </div>
                     <h2 className="text-xl font-bold text-[#1b1c1b] tracking-tight">Request Submitted</h2>
                     <p className="text-xs font-semibold text-gray-500 leading-relaxed max-w-[240px]">
-                      Your ticket ID is <strong className="text-[#b90064]">SUP-1035</strong>. Our team will review this shortly.
+                      Your ticket ID is <strong className="text-[#b90064]">{newTicketId ? newTicketId.slice(0, 8).toUpperCase() : '—'}</strong>. Our team will review this shortly.
                     </p>
                     <button 
                       onClick={() => { setShowSuccess(false); setCurrentTab('tickets'); }}

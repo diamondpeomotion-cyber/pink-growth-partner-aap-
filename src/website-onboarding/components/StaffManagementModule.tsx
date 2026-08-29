@@ -7,7 +7,6 @@ import {
   UserX, 
   Plus, 
   Search, 
-  Filter, 
   LayoutGrid, 
   List, 
   ShieldCheck, 
@@ -20,14 +19,9 @@ import {
   Calendar, 
   Phone, 
   PhoneOff, 
-  DollarSign, 
   Star, 
   Copy, 
   CheckCircle,
-  Briefcase,
-  Layers,
-  ChevronRight,
-  Download,
   AlertCircle
 } from 'lucide-react';
 import { 
@@ -36,7 +30,6 @@ import {
   StaffStatus, 
   AppAccessRole, 
   WeeklySchedule, 
-  WeeklyScheduleDay, 
   DEFAULT_WEEKLY_SCHEDULE 
 } from '../types';
 import { motion, AnimatePresence } from 'motion/react';

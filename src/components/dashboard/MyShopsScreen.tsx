@@ -73,8 +73,6 @@ export default function MyShopsScreen({
   onBack?: () => void;
 }) {
   const [shops, setShops] = useState<Shop[]>([]);
-  const [shopsLoading, setShopsLoading] = useState(true);
-  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
   
   const tabsScrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -112,11 +110,6 @@ export default function MyShopsScreen({
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => setIsOfflineMode(false);
-    const handleOffline = () => setIsOfflineMode(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     // Live data: shops attributed to this partner from the shared project.
     const loadData = async () => {
       try {
@@ -143,16 +136,9 @@ export default function MyShopsScreen({
       } catch (err) {
         console.warn('My shops load failed:', err);
         setShops([]);
-      } finally {
-        setShopsLoading(false);
       }
     };
     void loadData();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
   }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -251,11 +237,6 @@ export default function MyShopsScreen({
       )
       .sort((a, b) => (a.distanceM ?? Number.POSITIVE_INFINITY) - (b.distanceM ?? Number.POSITIVE_INFINITY));
   }, [filteredShops, geo.fix]);
-
-  // Handle Bottom Sheet filters apply
-  const handleApplyFilters = () => {
-    setFilterDropdownOpen(false);
-  };
 
   const handleClearFilters = () => {
     setSelectedSort('Newest First');

@@ -15,8 +15,7 @@ import {
   RefreshCw,
   Sliders,
   Tags,
-  Undo,
-  AlertCircle
+  Undo
 } from 'lucide-react';
 import { motion } from 'motion/react';
 

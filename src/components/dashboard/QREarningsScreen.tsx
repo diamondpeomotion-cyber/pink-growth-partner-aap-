@@ -4,15 +4,11 @@ import {
   ArrowLeft,
   Bell,
   Calendar,
-  DollarSign,
   Info,
   Store,
   Wallet,
-  CheckCircle2,
   Clock,
   ArrowRight,
-  X,
-  Sparkles,
   ChevronRight,
   AlertCircle
 } from 'lucide-react';
@@ -55,29 +51,8 @@ export default function QREarningsScreen({
   const [weekAmount, setWeekAmount] = useState(0);
   const [nextRelease, setNextRelease] = useState<string | null>(null);
   
-  const [isOfflineMode, setIsOfflineMode] = useState(!navigator.onLine);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOfflineMode(false);
-    const handleOffline = () => setIsOfflineMode(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-
   // App view controls
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Weekly' | 'Monthly'>('All');
   const [expandedSection, setExpandedSection] = useState<'shops' | 'payouts'>('shops');
-  
-  // Interactive Simulation variables
-  const [payoutLoading, setPayoutLoading] = useState(false);
-  const [payoutSuccess, setPayoutSuccess] = useState(false);
-  const [showPayoutModal, setShowPayoutModal] = useState(false);
   
   // Historic state
   const [payouts, setPayouts] = useState<HistoricPayout[]>([]);
@@ -137,13 +112,6 @@ export default function QREarningsScreen({
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
-  };
-
-  // Read-only: no client-side money movement (Razorpay payout pipeline comes
-  // in a later phase per PDR). Payouts only ever appear from the server ledger.
-  const handleInitiatePayout = () => {
-    triggerToast('Withdrawals are not available yet — payouts arrive via the secure payout pipeline in a later phase.');
-    setShowPayoutModal(false);
   };
 
   return (
@@ -254,7 +222,7 @@ export default function QREarningsScreen({
                 <Store size={14} /> Shop Earnings Ledger
               </button>
               <button
-                onClick={() => setShowPayoutModal(true)}
+                onClick={() => triggerToast('Withdrawals are not available yet — payouts arrive via the secure payout pipeline in a later phase.')}
                 className="flex-1 bg-pink-50 hover:bg-pink-100 text-primary border border-pink-100 h-11 rounded-2xl font-extrabold text-xs flex justify-center items-center gap-1.5 cursor-pointer active:scale-98 transition-all"
               >
                 <Wallet size={14} /> Withdraw Instantly

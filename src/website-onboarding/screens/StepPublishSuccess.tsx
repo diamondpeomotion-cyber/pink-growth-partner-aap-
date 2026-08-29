@@ -5,7 +5,6 @@ import {
   CheckCircle2, 
   Globe, 
   Copy, 
-  Share2, 
   LayoutDashboard, 
   ExternalLink, 
   Sparkles, 
@@ -16,9 +15,7 @@ import {
   X,
   Check,
   Wand2,
-  Sliders,
-  RefreshCw,
-  Undo
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 

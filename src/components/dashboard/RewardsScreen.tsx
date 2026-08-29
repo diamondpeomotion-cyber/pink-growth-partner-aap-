@@ -1,20 +1,17 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   ArrowLeft,
   Bell,
   Info,
-  CheckCircle2,
   ArrowRight,
   Sparkles,
-  Plus,
   X,
   Gift,
-  TrendingUp,
   AlertTriangle,
   Zap,
-  Check,
   Star,
-  Store
+  Store,
+  RefreshCw
 } from 'lucide-react';
 import rewardScooter from '../../assets/images/reward-scooter.jpg';
 import BottomNav from './BottomNav';
@@ -40,53 +37,85 @@ export default function RewardsScreen({
   onNavigate: (page: string) => void;
   onBack: () => void;
 }) {
-  // Live qualifying count: active shops attributed to this partner.
+  // Live qualifying count + scan counts from shop_attributions (no hardcoded 0s).
   const [qualifyingCount, setQualifyingCount] = useState<number>(0);
   const [allShops, setAllShops] = useState<RewardShop[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadShops = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const partner = await resolveGrowthPartner(supabase, user.id);
+      if (!partner) return;
+      const rows = await fetchMyAttributions(supabase, String(partner.id));
+      const active = rows.filter((a) => a.status === 'active');
+      const pending = rows.filter((a) => a.status !== 'active');
+      setQualifyingCount(active.length);
+      const mapShop = (a: { id: string; salon_name?: string; effective_from?: string | null }, scans: number, verified: boolean): RewardShop => ({
+        id: String(a.id),
+        name: a.salon_name ?? 'Shop',
+        code: a.salon_name ?? '',
+        status: (verified ? 'Verified' : 'Pending') as RewardShop['status'],
+        onboardedDate: a.effective_from ? new Date(a.effective_from).toISOString().slice(0, 10) : '',
+        activeScansCount: scans,
+        daysRemaining: verified ? undefined : 15,
+      });
+      // Verified = active attributions with their real live scan counts.
+      const verifiedShops = active.map((a) => mapShop(a, Number(a.active_scans ?? 0), true));
+      // Non-active attributions shown as a pending pipeline (no fabricated data).
+      const pendingShops = pending.map((a) => mapShop(a, Number(a.active_scans ?? 0), false));
+      setAllShops([...verifiedShops, ...pendingShops]);
+    } catch (err) {
+      console.warn('Rewards progress load failed:', err);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        if (!supabase) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) return;
-        const partner = await resolveGrowthPartner(supabase, user.id);
-        if (!partner || cancelled) return;
-        const rows = await fetchMyAttributions(supabase, String(partner.id));
-        if (cancelled) return;
-        const active = rows.filter((a) => a.status === 'active');
-        setQualifyingCount(active.length);
-        setAllShops(active.map((a) => ({
-          id: String(a.id),
-          name: a.salon_name ?? 'Shop',
-          code: a.salon_name ?? '',
-          status: 'Verified' as const,
-          onboardedDate: a.effective_from ? new Date(a.effective_from).toISOString().slice(0, 10) : '',
-          activeScansCount: 0,
-        })));
-      } catch (err) {
-        console.warn('Rewards progress load failed:', err);
-      }
+    const run = async () => {
+      if (cancelled) return;
+      await loadShops();
+      if (cancelled || !supabase) return;
+      const client = supabase;
+      // Real-time updates: subscribe to shop_attributions changes so scan counts
+      // and qualification status refresh live without a manual reload.
+      const { data: { user } } = await client.auth.getUser();
+      if (!user || cancelled) return;
+      const partner = await resolveGrowthPartner(client, user.id);
+      if (!partner || cancelled) return;
+      const channel = client
+        .channel(`rewards-attributions-${partner.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'shop_attributions', filter: `growth_partner_id=eq.${partner.id}` },
+          () => { void loadShops(); },
+        )
+        .subscribe();
+      return () => {
+        void client.removeChannel(channel);
+      };
     };
-    void load();
+    void run();
     return () => { cancelled = true; };
-  }, []);
-  
+  }, [loadShops]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadShops();
+    setIsRefreshing(false);
+    triggerToast('Reward progress refreshed from Supabase.');
+  };
+
   // Modal controllers
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showRewardDetails, setShowRewardDetails] = useState(false);
   const [showShopList, setShowShopList] = useState(false);
-  const [showOnboardShop, setShowOnboardShop] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
-  
+
   // Modal Tab
   const [modalTab, setModalTab] = useState<'Verified' | 'Pending'>('Verified');
-
-  // Interactive Form state
-  const [newShopName, setNewShopName] = useState('');
-  const [newShopScans, setNewShopScans] = useState('15');
-  const [instantQualify, setInstantQualify] = useState(true);
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -112,46 +141,6 @@ export default function RewardsScreen({
       progressPercent
     };
   }, [qualifyingCount]);
-
-  const handleOnboardSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newShopName.trim()) {
-      triggerToast('❌ Please provide a shop name!');
-      return;
-    }
-
-    const nextId = `sim-shop-${Date.now()}`;
-    const nextCode = `NX-SHOP-0${Math.floor(400 + Math.random() * 500)}`;
-    const scans = parseInt(newShopScans) || 0;
-
-    const newShop: RewardShop = {
-      id: nextId,
-      name: newShopName,
-      code: nextCode,
-      status: instantQualify ? 'Verified' : 'Pending',
-      onboardedDate: 'Today',
-      activeScansCount: scans,
-      daysRemaining: instantQualify ? undefined : 15
-    };
-
-    setAllShops([newShop, ...allShops]);
-    
-    if (instantQualify) {
-      setQualifyingCount(prev => prev + 1);
-      triggerToast(`🎉 ${newShopName} successfully onboarded & qualified! Progress increased!`);
-    } else {
-      triggerToast(`⏳ ${newShopName} registered. Verification process initiated.`);
-    }
-
-    setNewShopName('');
-    setShowOnboardShop(false);
-  };
-
-  const handleForceQualifyShop = (id: string, name: string) => {
-    setAllShops(prev => prev.map(s => s.id === id ? { ...s, status: 'Verified', daysRemaining: undefined } : s));
-    setQualifyingCount(prev => prev + 1);
-    triggerToast(`⚡ Manual audit completed! ${name} is now certified.`);
-  };
 
   return (
     <div className="bg-[#fcf9f8] text-[#1b1c1b] antialiased min-h-screen flex flex-col relative overflow-x-hidden pb-24 font-sans w-full shadow-lg border-x border-gray-100">
@@ -181,6 +170,14 @@ export default function RewardsScreen({
         </div>
 
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => void handleRefresh()}
+            disabled={isRefreshing}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
+            title="Refresh from Supabase"
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'animate-spin text-primary' : ''} />
+          </button>
           <button
             onClick={() => setShowHowItWorks(true)}
             className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
@@ -362,19 +359,9 @@ export default function RewardsScreen({
                         {shop.status}
                       </span>
                       {!isVerified && (
-                        <p className="text-[9px] text-gray-400 font-semibold block mt-1">Needs {15 - shop.activeScansCount} scans</p>
+                        <p className="text-[9px] text-gray-400 font-semibold block mt-1">Needs {Math.max(0, 15 - shop.activeScansCount)} more scans</p>
                       )}
                     </div>
-
-                    {!isVerified && (
-                      <button
-                        onClick={() => handleForceQualifyShop(shop.id, shop.name)}
-                        className="bg-emerald-600 text-white p-2 rounded-xl text-[10px] font-bold shadow-2xs hover:bg-emerald-700 active:scale-90 cursor-pointer shrink-0 flex items-center justify-center"
-                        title="Audit & Qualify"
-                      >
-                        <Check size={13} className="stroke-[3px]" />
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -609,80 +596,7 @@ export default function RewardsScreen({
         </div>
       )}
 
-      {/* Modal D: Onboard and Simulate a new Partner shop */}
-      {showOnboardShop && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
-            onClick={() => setShowOnboardShop(false)}
-          ></div>
-
-          <form
-            onSubmit={handleOnboardSubmit}
-            className="relative bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl z-10 animate-in zoom-in-95"
-          >
-            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <span className="text-primary font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
-                <Store size={15} /> Onboard New Partner Shop
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowOnboardShop(false)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-full cursor-pointer"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Shop Name</label>
-                <input
-                  type="text"
-                  value={newShopName}
-                  onChange={(e) => setNewShopName(e.target.value)}
-                  placeholder="e.g. Royal Unisex Salon"
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Active Scans Count</label>
-                <input
-                  type="number"
-                  value={newShopScans}
-                  onChange={(e) => setNewShopScans(e.target.value)}
-                  className="w-full h-11 px-3 bg-gray-50 border-none rounded-2xl font-bold focus:ring-1 focus:ring-primary/20 text-gray-950"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                <div>
-                  <span className="font-bold text-gray-800 text-[11px] block">Instantly Qualify Shop</span>
-                  <span className="text-[9.5px] text-gray-400 font-medium">Bypass 15 active scans audit period</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={instantQualify}
-                  onChange={(e) => setInstantQualify(e.target.checked)}
-                  className="w-5 h-5 rounded-md text-primary focus:ring-primary border-gray-300"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-primary text-white h-11 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <CheckCircle2 size={14} /> Register & Onboard Partner
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Modal E: Confetti / Claim Scooter Success Selector Modal */}
+      {/* Modal D: Claim Scooter Success Selector Modal */}
       {showClaimModal && (
         <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
           <div

@@ -163,7 +163,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
   const [dupCheckStatus, setDupCheckStatus] = useState<'none' | 'success' | 'warning'>('none');
-  const [draftSaved, setDraftSaved] = useState(false);
+  const [draftSaved] = useState(false);
 
   // Step 2 State: Shop & Location Details
   const [shopName, setShopName] = useState(() => draft.shopName ?? '');
@@ -212,9 +212,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [startingPrice, setStartingPrice] = useState('');
   const [yearsInBusiness, setYearsInBusiness] = useState('');
   const [businessGenderType, setBusinessGenderType] = useState('Women');
-  const [gstin, setGstin] = useState(() => draft.gstin ?? '');
-  const [businessType, setBusinessType] = useState(() => draft.businessType ?? 'proprietorship');
-  const [annualTurnover, setAnnualTurnover] = useState(() => draft.annualTurnover ?? '10l_25l');
+  const [gstin] = useState(() => draft.gstin ?? '');
+  const [businessType] = useState(() => draft.businessType ?? 'proprietorship');
+  const [annualTurnover] = useState(() => draft.annualTurnover ?? '10l_25l');
   const [services, setServices] = useState<{ name: string; price: string; duration: string }[]>([]);
   const [aboutShop, setAboutShop] = useState('');
   const [isAddingService, setIsAddingService] = useState(false);
@@ -223,7 +223,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   const [newServiceDuration, setNewServiceDuration] = useState('');
 
   // Step 4 State: Website Setup & Branding
-  const [websiteUrl, setWebsiteUrl] = useState(() => draft.websiteUrl ?? '');
+  const [websiteUrl] = useState(() => draft.websiteUrl ?? '');
   const [isPublished, setIsPublished] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('store_is_published');
@@ -252,7 +252,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
       triggerDocToast('info', 'Store Unpublished', 'Store is currently hidden from public.');
     }
   };
-  const [instagramHandle, setInstagramHandle] = useState(() => draft.instagramHandle ?? '');
+  const [instagramHandle] = useState(() => draft.instagramHandle ?? '');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>(() => draft.socialLinks ?? {
     facebook: '',
     instagram: '',
@@ -399,20 +399,17 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
   };
 
   const [selectedTemplate, setSelectedTemplate] = useState('modern-salon');
-  const [devState, setDevState] = useState<'default' | 'empty' | 'uploading' | 'error'>('default');
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
   const [shopLogo, setShopLogo] = useState<string | null>(null);
   const [interiorPhotos, setInteriorPhotos] = useState<string[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<{ id: string, name: string, img: string, desc: string } | null>(null);
 
-  // Step 5 State: Documents
-  const [panNumber, setPanNumber] = useState(() => draft.panNumber ?? '');
-  const [panUploaded, setPanUploaded] = useState(false);
-  const [addressProofUploaded, setAddressProofUploaded] = useState(false);
-  const [ownerIdProofFile, setOwnerIdProofFile] = useState<string | null>(null);
-  const [ownerIdProofSize, setOwnerIdProofSize] = useState<string>('');
-  const [shopFrontFile, setShopFrontFile] = useState<string | null>(null);
-  const [shopFrontPreview, setShopFrontPreview] = useState<string | null>(null);
+  // Step 5 State: Documents (setter-only — values are not read by the UI)
+  const [panNumber] = useState(() => draft.panNumber ?? '');
+  const [, setOwnerIdProofFile] = useState<string | null>(null);
+  const [, setOwnerIdProofSize] = useState<string>('');
+  const [, setShopFrontFile] = useState<string | null>(null);
+  const [, setShopFrontPreview] = useState<string | null>(null);
 
   // Enhanced Document Management State
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([]);
@@ -461,7 +458,6 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
 
     // 1b. Format Validation for Shop Front Photo (JPG, PNG, WEBP)
     if (targetType === 'shop_front') {
-      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
       const ext = file.name.split('.').pop()?.toLowerCase();
       const isValidExt = ext && ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
       
@@ -507,7 +503,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     if (isImageFile) {
       try {
         previewUrl = URL.createObjectURL(file);
-      } catch (err) {
+      } catch {
         previewUrl = null;
       }
     }
@@ -955,48 +951,9 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     socialLinks,
     customLinks,
     panNumber,
-    currentStep
+    currentStep,
+    capturedLocation
   ]);
-
-  const saveDraft = () => {
-    const draftPayload = {
-      ownerName,
-      mobileNumber,
-      whatsappNumber,
-      sameAsMobile,
-      email,
-      preferredLang,
-      shopName,
-      shopCategory,
-      stateName,
-      districtName,
-      cityName,
-      localityName,
-      fullAddress,
-      pincode,
-      landmark,
-      shopPhotos,
-      gstin,
-      businessType,
-      annualTurnover,
-      websiteUrl,
-      isPublished,
-      instagramHandle,
-      socialLinks,
-      customLinks,
-      panNumber,
-      currentStep,
-      capturedLocation, // real GPS fix: { latitude, longitude, accuracy, timestamp }
-      lastSaved: new Date().toISOString()
-    };
-    try {
-      localStorage.setItem('add_shop_form_draft', JSON.stringify(draftPayload));
-    } catch (e) {
-      console.error('Failed to manually save draft to localStorage:', e);
-    }
-    setDraftSaved(true);
-    setTimeout(() => setDraftSaved(false), 3000);
-  };
 
   const handleDetectLocation = () => {
     setIsDetectingLocation(true);
@@ -1068,7 +1025,7 @@ export default function AddShop({ onBack, onComplete }: { onBack: () => void, on
     if (stepId === 5) return documentPrivacyConsent;
     return true;
   };
-  const canNavigateToStep = (targetStep: number): boolean => true;
+  const canNavigateToStep = (_targetStep: number): boolean => true;
 
   /**
    * The app shell scrolls an inner flex container, not the window, so

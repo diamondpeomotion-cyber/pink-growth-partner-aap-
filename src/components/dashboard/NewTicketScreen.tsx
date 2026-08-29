@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
+import { createSupportTicket } from '../../lib/supportRepository';
 
 interface NewTicketScreenProps {
   onBack: () => void;
@@ -22,14 +24,34 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
   const [priority, setPriority] = useState('medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [ticketId, setTicketId] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) {
+      setSubmitError('Supabase is not configured.');
+      return;
+    }
     setIsSubmitting(true);
-    
-    setIsSubmitting(false);
-    setShowSuccess(false);
-    alert('Support tickets are not stored on the server from this screen yet. Email Nexora ops instead.');
+    setSubmitError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sign in required.');
+      const { id } = await createSupportTicket(supabase, {
+        userId: user.id,
+        subject,
+        description,
+        category: category || undefined,
+        priority,
+      });
+      setTicketId(id);
+      setShowSuccess(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit ticket.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -173,9 +195,12 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
 
             {/* Submit Button */}
             <div className="pt-4">
+              {submitError && (
+                <p className="text-xs font-semibold text-rose-600 mb-3 text-center">{submitError}</p>
+              )}
               <button 
                 type="submit"
-                disabled={isSubmitting || showSuccess}
+                disabled={isSubmitting}
                 className="w-full h-14 rounded-2xl bg-[#b90064] text-white text-sm font-bold shadow-lg hover:bg-pink-800 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70 disabled:scale-100"
               >
                 {isSubmitting ? (
@@ -184,13 +209,11 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                     className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                   />
-                ) : showSuccess ? (
+                ) : (
                   <>
                     <CheckCircle2 size={20} />
-                    <span>Ticket Submitted</span>
+                    <span>Submit Ticket</span>
                   </>
-                ) : (
-                  <span>Submit Ticket</span>
                 )}
               </button>
             </div>
@@ -216,7 +239,20 @@ export default function NewTicketScreen({ onBack, onNavigate }: NewTicketScreenP
               <CheckCircle2 size={48} />
             </motion.div>
             <h2 className="text-2xl font-bold text-[#1b1c1b] tracking-tight mb-2">Ticket Submitted!</h2>
-            <p className="text-[#5a3f47] font-medium max-w-xs">Your support request has been received. We'll update you shortly.</p>
+            {ticketId && (
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                Reference {ticketId.slice(0, 8).toUpperCase()}
+              </p>
+            )}
+            <p className="text-[#5a3f47] font-medium max-w-xs">Your support request has been saved to the server. Our team will review it shortly.</p>
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate('support')}
+                className="mt-4 w-full h-12 rounded-2xl bg-[#b90064] text-white text-sm font-bold active:scale-95 transition-all cursor-pointer"
+              >
+                Track Request
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

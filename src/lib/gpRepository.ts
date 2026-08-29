@@ -22,6 +22,8 @@ export interface GpAttribution {
   status: string;
   attribution_method: string | null;
   effective_from: string | null;
+  /** Live count of qualifying customer QR scans (rewards/qualification). */
+  active_scans?: number;
   salon_name?: string;
   salon_city?: string;
   salon_area?: string;
@@ -77,6 +79,116 @@ const isMissingRelationError = (error: { code?: string; message?: string } | nul
     /could not find a (table|schema)|relation .* does not exist/i.test(error.message || '')
   );
 };
+
+/** Postgres unique-violation code — used to collapse concurrent inserts. */
+const isUniqueViolation = (error: { code?: string; message?: string } | null): boolean =>
+  Boolean(error) && (error?.code === '23505' || /duplicate key value violates unique constraint/i.test(error?.message ?? ''));
+
+/** Statuses that count as an "open" application eligible for de-duplication. */
+const OPEN_APPLICATION_STATUSES = ['draft', 'submitted', 'changes_requested'];
+
+/**
+ * Find an existing open application for this partner, preferring an exact
+ * salon link and falling back to an exact shop-name match (so a brand-new shop
+ * submitted through AddShop — which has no `existing_salon_id` yet — is reused
+ * instead of creating a second row). Returns the application id or null.
+ */
+async function findExistingApplication(
+  client: SupabaseClient,
+  partnerId: string,
+  existingSalonId: string | null | undefined,
+  shopName: string | null | undefined,
+): Promise<string | null> {
+  if (existingSalonId) {
+    const { data, error } = await client
+      .from('shop_onboarding_applications')
+      .select('id')
+      .eq('submitted_by_partner_id', partnerId)
+      .eq('existing_salon_id', existingSalonId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (!error && data && data.length > 0) return String(data[0].id);
+  }
+  if (shopName && shopName.trim()) {
+    const { data, error } = await client
+      .from('shop_onboarding_applications')
+      .select('id')
+      .eq('submitted_by_partner_id', partnerId)
+      .eq('shop_name', shopName.trim())
+      .in('status', OPEN_APPLICATION_STATUSES)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (!error && data && data.length > 0) return String(data[0].id);
+  }
+  return null;
+}
+
+export interface FindOrCreateApplicationOptions {
+  partnerId: string;
+  /** Canonical salon id when the shop already exists; null for brand-new shops. */
+  existingSalonId?: string | null;
+  /** Shop name — the de-duplication key for brand-new (salon-less) applications. */
+  shopName?: string | null;
+  /** Full row values used when inserting a brand-new application. */
+  createFields: Record<string, unknown>;
+  /** Columns to merge into an existing row (progress fields). Optional. */
+  updateFields?: Record<string, unknown>;
+}
+
+/**
+ * Atomically-aimed find-or-create for `shop_onboarding_applications`.
+ *
+ * Resolves an existing open application by (in order) `existing_salon_id`, then
+ * exact `shop_name` among draft/submitted/changes_requested. If found it is
+ * updated (never duplicated); otherwise a single row is inserted. On a
+ * concurrent-insert unique violation (see migration unique constraints) it
+ * re-fetches and returns the winner, so two callers cannot both insert the same
+ * shop. A database transaction is not possible over the client API; the
+ * migration's unique indexes are the authoritative guard, this is the client
+ * half that makes the common single-writer path deterministic.
+ */
+export async function findOrCreateShopApplication(
+  client: SupabaseClient,
+  opts: FindOrCreateApplicationOptions,
+): Promise<{ applicationId: string; created: boolean }> {
+  const existingId = await findExistingApplication(
+    client,
+    opts.partnerId,
+    opts.existingSalonId,
+    opts.shopName,
+  );
+  if (existingId) {
+    const patch = { ...(opts.updateFields ?? {}), ...opts.createFields };
+    await client
+      .from('shop_onboarding_applications')
+      .update(patch)
+      .eq('id', existingId)
+      .then(undefined, () => undefined); // best-effort progress update
+    return { applicationId: existingId, created: false };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('shop_onboarding_applications')
+      .insert(opts.createFields)
+      .select('id')
+      .single();
+    if (error) throw error;
+    return { applicationId: String(data.id), created: true };
+  } catch (err) {
+    const apiError = (err as { code?: string; message?: string }) ?? {};
+    if (isUniqueViolation(apiError)) {
+      const winner = await findExistingApplication(
+        client,
+        opts.partnerId,
+        opts.existingSalonId,
+        opts.shopName,
+      );
+      if (winner) return { applicationId: winner, created: false };
+    }
+    throw err;
+  }
+}
 
 /**
  * Resolve the growth_partners row for the signed-in auth user.
@@ -182,7 +294,7 @@ export async function fetchMyAttributions(
 ): Promise<GpAttribution[]> {
   const { data, error } = await client
     .from('shop_attributions')
-    .select('id, salon_id, status, attribution_method, effective_from')
+    .select('id, salon_id, status, attribution_method, effective_from, active_scans')
     .eq('growth_partner_id', partnerId)
     .order('effective_from', { ascending: false });
   if (error) {
@@ -332,11 +444,11 @@ export async function fetchMyPayouts(
   client: SupabaseClient,
   partnerId: string,
 ): Promise<PartnerPayout[]> {
-  // select=* is intentionally defensive: the live partner_payouts columns are
-  // not documented in any migration; amount fields differ per environment.
+  // Explicit, canonical column mapping — no dynamic key fallbacks. These match
+  // the versioned schema in supabase/migrations/001_gp_pwa_schema_and_rls.sql.
   const { data, error } = await client
     .from('partner_payouts')
-    .select('*')
+    .select('id, amount_paise, status, created_at, paid_at')
     .eq('growth_partner_id', partnerId)
     .order('created_at', { ascending: false });
   if (error) {
@@ -346,9 +458,9 @@ export async function fetchMyPayouts(
   return ((data ?? []) as any[]).map((r) => ({
     id: String(r.id),
     status: String(r.status ?? 'unknown'),
-    amountPaise: Number(r.amount_paise ?? r.total_paise ?? r.amount ?? 0),
+    amountPaise: Number(r.amount_paise ?? 0),
     createdAt: r.created_at ? String(r.created_at) : null,
-    paidAt: r.paid_at ?? r.settled_at ?? null,
+    paidAt: r.paid_at ? String(r.paid_at) : null,
   }));
 }
 
@@ -410,6 +522,22 @@ export interface ShopApplicationInput {
   services?: Array<{ name: string; price: string; duration: string }>;
 }
 
+/** Strictly-typed salon-setup proposal payload written to the shared project. */
+export interface ShopApplicationProposalPayload {
+  profile: {
+    name: string;
+    description: string;
+    phone: string;
+    email: string;
+    address: string;
+    area: string;
+    city: string;
+    opening_hours: { opens: string; closes: string };
+  };
+  services: Array<{ name: string; price: string; duration: string }>;
+  template: { key: string };
+}
+
 /**
  * Submit a new shop application + website-setup proposal. Contract mirrors the
  * proven dashboard flow (save_growth_partner_salon_setup RPC).
@@ -450,53 +578,21 @@ export async function submitShopApplication(
     website_template: input.websiteTemplate,
   };
 
-  // 2. Reuse an existing draft/submitted application for this shop instead of
-  // inserting a second row (duplicate existing_salon_id / shop_name).
-  let applicationId: string | null = null;
-  if (input.existingSalonId) {
-    const { data: existingBySalon } = await client
-      .from('shop_onboarding_applications')
-      .select('id')
-      .eq('submitted_by_partner_id', partner.id)
-      .eq('existing_salon_id', input.existingSalonId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (existingBySalon && existingBySalon.length > 0) {
-      applicationId = String(existingBySalon[0].id);
-    }
-  }
-  if (!applicationId && shopName) {
-    const { data: existingByName } = await client
-      .from('shop_onboarding_applications')
-      .select('id')
-      .eq('submitted_by_partner_id', partner.id)
-      .eq('shop_name', shopName)
-      .in('status', ['draft', 'submitted'])
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (existingByName && existingByName.length > 0) {
-      applicationId = String(existingByName[0].id);
-    }
-  }
-
-  if (applicationId) {
-    const { error: updErr } = await client
-      .from('shop_onboarding_applications')
-      .update(applicationFields)
-      .eq('id', applicationId);
-    if (updErr) throw updErr;
-  } else {
-    const { data: app, error: appErr } = await client
-      .from('shop_onboarding_applications')
-      .insert(applicationFields)
-      .select('id')
-      .single();
-    if (appErr) throw appErr;
-    applicationId = String(app.id);
-  }
+  // 2. Atomically-aimed find-or-create — reuse an existing draft/submitted
+  // application for this shop instead of inserting a second row. For brand-new
+  // shops (existing_salon_id is null) this de-duplicates by exact shop_name
+  // among open statuses, so the follow-on Website Onboarding step reuses the
+  // SAME application row instead of creating a duplicate.
+  const { applicationId } = await findOrCreateShopApplication(client, {
+    partnerId: String(partner.id),
+    existingSalonId: input.existingSalonId ?? null,
+    shopName,
+    createFields: applicationFields,
+    updateFields: applicationFields,
+  });
 
   // 3. Save the website-setup proposal payload (validated & owner-resolved server-side)
-  const payload = {
+  const payload: ShopApplicationProposalPayload = {
     profile: {
       name: shopName,
       description: input.aboutShop.trim(),
@@ -523,7 +619,8 @@ export async function submitShopApplication(
 
 export interface SaveProposalInput {
   applicationId: string;
-  payload: Record<string, unknown>;
+  /** Strictly-typed proposal payload (see ShopApplicationProposalPayload). */
+  payload: ShopApplicationProposalPayload;
   isSubmit: boolean; // false = draft, true = submit for owner approval
 }
 

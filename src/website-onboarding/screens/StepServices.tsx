@@ -1,4 +1,4 @@
-import { Sparkles, Mic, ArrowLeft, ArrowRight, Plus, Check, Edit2, Copy, Trash2, GripVertical, Info, Volume2, X } from 'lucide-react';
+import { Sparkles, Mic, ArrowLeft, ArrowRight, Plus, Check, Copy, Trash2, GripVertical, Info, Volume2, X } from 'lucide-react';
 import { SalonData, Service, Package } from '../types';
 import PreviewPane from '../components/PreviewPane';
 import { createId } from '../../utils/id';

@@ -1,6 +1,6 @@
 import { Sparkles, ArrowRight, Scissors, Edit2, Plus, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { SalonData } from '../types';
-import React, { useState } from 'react';
+import React from 'react';
 
 interface Props {
   data: SalonData;
@@ -11,7 +11,6 @@ interface Props {
 }
 
 export default function StepPublish({ data, setData, onNext, onPrev, onSave }: Props) {
-  const [mode, setMode] = useState<'desktop' | 'mobile'>('desktop');
   const appearance = data.websiteAppearance || 'light';
 
   const selectAppearance = (app: 'light' | 'dark') => {

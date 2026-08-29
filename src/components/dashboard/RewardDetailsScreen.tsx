@@ -224,7 +224,7 @@ export default function RewardDetailsScreen({
   // inline in the JSX with Date.now(), so the "Claim ID" shown to the partner
   // changed on every re-render of the success dialog.
   const [claimId, setClaimId] = useState<string>('');
-  const [claimType, setClaimType] = useState<'scooter' | 'cash' | 'welcome' | 'tablet' | 'laptop' | null>(null);
+
 
   const activeReward = MILESTONES.find(m => m.id === selectedRewardId) || MILESTONES[3];
 
@@ -253,17 +253,6 @@ export default function RewardDetailsScreen({
 
   const handleClaimReward = () => {
     if (!isClaimUnlocked) return;
-    setClaimType(
-      activeReward.id === 250 
-        ? 'scooter' 
-        : activeReward.id === 25 
-        ? 'welcome'
-        : activeReward.id === 50 
-        ? 'tablet'
-        : activeReward.id === 100 
-        ? 'laptop'
-        : 'cash'
-    );
     setClaimId(createShortRef());
     setShowClaimSuccess(true);
   };

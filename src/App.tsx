@@ -11,6 +11,7 @@ import OfflineNotificationBanner from './components/OfflineNotificationBanner';
 import {
   supabase,
   supabaseConfigError,
+  getSupabaseEnvDiagnostics,
   initialRecoveryLink,
   initialRecoveryTokens,
   clearAllAuthStorage,
@@ -432,11 +433,31 @@ export default function App() {
 
 
   if (supabaseConfigError) {
+    // Surface exactly which environment variable is missing/invalid so the
+    // failure is actionable (see lib/supabase.ts:getSupabaseEnvDiagnostics).
+    const diag = getSupabaseEnvDiagnostics();
     return (
       <div className="min-h-screen bg-[#fcf9f8] flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 text-center shadow-sm">
           <h1 className="mb-2 text-lg font-bold text-[#1b1c1b]">Configuration required</h1>
           <p className="text-sm leading-6 text-gray-600">{supabaseConfigError}</p>
+          <dl className="mt-4 space-y-1 text-left text-xs text-gray-600">
+            <div className="flex justify-between gap-4">
+              <dt>VITE_SUPABASE_URL</dt>
+              <dd className={diag.urlPresent ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                {diag.urlPresent ? (diag.urlValid ? 'set ✓' : 'set but invalid') : 'missing'}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>VITE_SUPABASE_ANON_KEY</dt>
+              <dd className={diag.keyPresent ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                {diag.keyPresent ? (diag.keyValid ? 'set ✓' : 'set but invalid') : 'missing'}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-xs text-gray-400">
+            Add the missing variables to your hosting environment or .env.local (see .env.example).
+          </p>
         </div>
       </div>
     );

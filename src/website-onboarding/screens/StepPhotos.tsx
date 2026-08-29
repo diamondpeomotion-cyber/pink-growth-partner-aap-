@@ -1,6 +1,6 @@
 import { 
   ArrowLeft, ArrowRight, Plus, Edit2, Trash2, X, Image as ImageIcon, Monitor, 
-  Sparkles, Upload, Check, ChevronLeft, ChevronRight, Wand2, Eye, RefreshCw
+  Sparkles, Upload, Check, ChevronLeft, ChevronRight, Wand2
 } from 'lucide-react';
 import { SalonData, GalleryImage } from '../types';
 import PreviewPane from '../components/PreviewPane';

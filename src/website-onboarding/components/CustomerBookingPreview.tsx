@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Lock,
   Smartphone,
-  HelpCircle,
   QrCode,
   Phone,
   MessageSquare

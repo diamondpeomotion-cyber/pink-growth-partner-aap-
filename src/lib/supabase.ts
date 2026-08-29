@@ -82,12 +82,17 @@ export const validateSupabaseConfig = (
   const anonKey = typeof rawAnonKey === 'string' ? rawAnonKey.trim() : '';
 
   if (!url || !anonKey) {
+    const missing = [
+      !url ? 'VITE_SUPABASE_URL' : null,
+      !anonKey ? 'VITE_SUPABASE_ANON_KEY' : null,
+    ].filter(Boolean);
     return {
       isValid: false,
       url: null,
       anonKey: null,
-      error:
-        'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the hosting environment.',
+      error: `Supabase is not configured. Missing environment variable${
+        missing.length > 1 ? 's' : ''
+      }: ${missing.join(', ')}. Add them to your hosting environment or .env.local (see .env.example).`,
     };
   }
 
@@ -260,6 +265,62 @@ export const clearAllAuthStorage = (): void => {
 };
 
 export const supabaseConfigError = config.isValid ? null : config.error;
+
+/**
+ * Structured diagnostics describing the current Supabase env state, so the UI
+ * (and ops) can tell exactly which environment variable is missing or invalid
+ * instead of showing a generic failure. Never throws — safe to call at render.
+ */
+export interface SupabaseEnvDiagnostics {
+  urlPresent: boolean;
+  keyPresent: boolean;
+  urlValid: boolean;
+  keyValid: boolean;
+  /** The exact raw value of VITE_SUPABASE_URL (may be empty). */
+  url: string;
+  /** null when absent; otherwise a safety-redacted flag only (never the key). */
+  keyRedacted: string | null;
+  /** Human-readable problem, or null when the config is ready. */
+  configError: string | null;
+  /** True when the shared client was created and can be used. */
+  ready: boolean;
+}
+
+export const getSupabaseEnvDiagnostics = (): SupabaseEnvDiagnostics => {
+  const viteEnv = (import.meta as ImportMeta & {
+    env?: Record<string, string | undefined>;
+  }).env;
+  const url = typeof viteEnv?.VITE_SUPABASE_URL === 'string' ? viteEnv.VITE_SUPABASE_URL.trim() : '';
+  const key =
+    typeof viteEnv?.VITE_SUPABASE_ANON_KEY === 'string' ? viteEnv.VITE_SUPABASE_ANON_KEY.trim() : '';
+
+  let urlValid = false;
+  let keyValid = false;
+  if (url) {
+    try {
+      const p = new URL(url);
+      urlValid =
+        p.protocol === 'https:' &&
+        p.hostname === EXPECTED_SUPABASE_HOSTNAME &&
+        !p.username &&
+        !p.password;
+    } catch {
+      urlValid = false;
+    }
+  }
+  if (key) keyValid = isBrowserSafeSupabaseKey(key);
+
+  return {
+    urlPresent: Boolean(url),
+    keyPresent: Boolean(key),
+    urlValid,
+    keyValid,
+    url,
+    keyRedacted: key ? '(set)' : null,
+    configError: config.isValid ? null : config.error,
+    ready: config.isValid,
+  };
+};
 
 /**
  * Build a Nexora-configured client. Used by the app singleton below and by

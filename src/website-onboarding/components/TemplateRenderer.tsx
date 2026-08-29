@@ -1,5 +1,5 @@
 import { SalonData, getPublicStaffData } from '../types';
-import { Sparkles, Phone, MessageCircle, CalendarCheck, MapPin, Clock, Navigation, Instagram, Facebook, Youtube, Video, Heart, ExternalLink, CreditCard } from 'lucide-react';
+import { Sparkles, Phone, MessageCircle, CalendarCheck, MapPin, Clock, Navigation, Video, Heart, CreditCard } from 'lucide-react';
 
 interface Props {
   data: SalonData;

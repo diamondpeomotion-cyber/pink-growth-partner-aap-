@@ -10,7 +10,6 @@ import {
   Navigation, 
   Search, 
   Copy, 
-  Check, 
   Building2, 
   CheckCircle2, 
   Crosshair 

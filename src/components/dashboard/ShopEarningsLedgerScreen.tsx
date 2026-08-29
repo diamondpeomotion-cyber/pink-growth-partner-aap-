@@ -5,12 +5,10 @@ import {
   ArrowLeft,
   Search,
   QrCode,
-  CheckCircle2,
   AlertCircle,
   Info,
   Calendar,
   X,
-  Plus,
   Sparkles,
   Award,
   RefreshCw,
@@ -49,7 +47,7 @@ export default function ShopEarningsLedgerScreen({
   onBack?: () => void;
 }) {
   const [ledgerItems, setLedgerItems] = useState<LedgerItem[]>([]);
-  const [ledgerLoading, setLedgerLoading] = useState(true);
+
   const [selectedFilter, setSelectedFilter] = useState<'All' | 'Pending' | 'Available' | 'Paid' | 'Reversed'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -82,8 +80,6 @@ export default function ShopEarningsLedgerScreen({
         })));
       } catch (err) {
         console.warn('Ledger load failed:', err);
-      } finally {
-        if (!cancelled) setLedgerLoading(false);
       }
     };
     void load();

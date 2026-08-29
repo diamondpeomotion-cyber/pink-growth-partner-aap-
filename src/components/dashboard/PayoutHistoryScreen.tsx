@@ -41,7 +41,6 @@ export default function PayoutHistoryScreen({
   const [selectedPayout, setSelectedPayout] = useState<PayoutItem | null>(null);
   const [payableRupees, setPayableRupees] = useState(0);
   const [paidRupees, setPaidRupees] = useState(0);
-  const [heldRupees, setHeldRupees] = useState(0);
   const [nextRelease, setNextRelease] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +59,6 @@ export default function PayoutHistoryScreen({
         if (cancelled) return;
         setPayableRupees(paiseToRupees(summary.payablePaise));
         setPaidRupees(paiseToRupees(summary.paidPaise));
-        setHeldRupees(paiseToRupees(summary.heldPaise));
         setNextRelease(summary.nextReleaseDate);
         setPayouts(rows.map((p) => ({
           id: p.id,

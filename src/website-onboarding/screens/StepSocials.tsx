@@ -1,6 +1,6 @@
 import { 
   ArrowLeft, ArrowRight, Plus, Trash2, X, Share2, Camera, ThumbsUp, PlayCircle, 
-  Video as VideoIcon, CheckCircle2, Check, Monitor, Edit2, Sparkles, Link, ExternalLink
+  Video as VideoIcon, CheckCircle2, Check, Monitor, Edit2
 } from 'lucide-react';
 import { SalonData, SocialVideo } from '../types';
 import PreviewPane from '../components/PreviewPane';

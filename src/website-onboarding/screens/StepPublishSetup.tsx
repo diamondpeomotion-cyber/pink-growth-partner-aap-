@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalonData } from '../types';
 import TemplateRenderer from '../components/TemplateRenderer';
-import { ArrowLeft, ArrowRight, Globe, CheckCircle2, Link2, AlertCircle, Monitor, Smartphone, Circle, Check } from 'lucide-react';
+import { ArrowLeft, Globe, CheckCircle2, AlertCircle, Monitor, Smartphone, Circle, Check } from 'lucide-react';
 
 interface Props {
   data: SalonData;

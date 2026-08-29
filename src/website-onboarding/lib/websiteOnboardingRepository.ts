@@ -21,6 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SalonData } from '../types';
 import { createBlankSalonData } from '../types';
 import { assertShopBelongsToPartner } from '../../lib/shopContext';
+import { findOrCreateShopApplication } from '../../lib/gpRepository';
 
 export const ONBOARDING_PAYLOAD_VERSION = 2;
 
@@ -116,6 +117,45 @@ export function clearLocalDraft(userId: string, salonId: string): void {
 // SalonData <-> proposal payload
 // ---------------------------------------------------------------------------
 
+/**
+ * Strictly-typed shape of the `salon_setup_proposals.payload` JSONB column
+ * (canonical column defined in supabase/migrations/001_gp_pwa_schema_and_rls.sql).
+ * The first three keys are the untouched legacy contract; `onboarding` carries
+ * the full new-onboarding state additively.
+ */
+export interface SalonSetupProposalPayload {
+  profile: {
+    name: string;
+    description: string;
+    phone: string;
+    email: string;
+    address: string;
+    area: string;
+    city: string;
+    opening_hours: { opens: string; closes: string };
+  };
+  services: Array<{
+    id?: string;
+    name: string;
+    price: string;
+    duration: string;
+    price_amount: number;
+    duration_minutes: number;
+    category: string;
+    description: string;
+    featured: boolean;
+  }>;
+  template: { key: string };
+  onboarding: {
+    version: number;
+    source: 'website-onboarding';
+    salon_id: string;
+    step: number;
+    updated_at: string;
+    salon_data: SalonData;
+  };
+}
+
 const firstOpenDay = (data: SalonData) => {
   const hours = data.openingHours;
   if (!hours) return { opens: '10:00', closes: '20:00' };
@@ -124,14 +164,14 @@ const firstOpenDay = (data: SalonData) => {
 };
 
 /**
- * Build the proposal payload. The first three keys are the untouched legacy
- * contract; `onboarding` carries the full new-onboarding state additively.
+ * Build the strictly-typed proposal payload written to
+ * `salon_setup_proposals.payload`.
  */
 export function buildProposalPayload(
   data: SalonData,
   step: number,
   salonId: string,
-): Record<string, unknown> {
+): SalonSetupProposalPayload {
   const hours = firstOpenDay(data);
   return {
     profile: {
@@ -166,11 +206,32 @@ export function buildProposalPayload(
   };
 }
 
-/** Pull a stored SalonData back out of whatever payload column exists. */
-function extractSalonData(payload: unknown): { data: SalonData | null; step: number } {
-  if (!payload || typeof payload !== 'object') return { data: null, step: 0 };
-  const p = payload as Record<string, any>;
-  const onboarding = p.onboarding;
+/**
+ * Parse the `payload` column (JSONB object or JSON string) into a typed
+ * payload object. No dynamic column-name probing — the canonical column is
+ * `payload` (see migration). Returns null when it cannot be read as a payload.
+ */
+function parsePayload(raw: unknown): SalonSetupProposalPayload | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('{')) return null;
+    try {
+      return JSON.parse(trimmed) as SalonSetupProposalPayload;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as SalonSetupProposalPayload;
+  }
+  return null;
+}
+
+/** Pull a stored SalonData back out of the typed payload. */
+function extractSalonData(payload: SalonSetupProposalPayload | null): { data: SalonData | null; step: number } {
+  if (!payload) return { data: null, step: 0 };
+  const onboarding = payload.onboarding;
   if (onboarding && typeof onboarding === 'object' && onboarding.salon_data) {
     return {
       data: { ...createBlankSalonData(), ...(onboarding.salon_data as SalonData) },
@@ -179,18 +240,18 @@ function extractSalonData(payload: unknown): { data: SalonData | null; step: num
   }
   // Legacy payload written by the OLD Website implementation: rebuild what we
   // can so an existing shop does not start from a blank wizard.
-  if (p.profile || p.services || p.template) {
+  if (payload.profile || payload.services || payload.template) {
     // Blank base, never the template's demo persona: a legacy payload only
     // carried profile/services/template, and the missing fields must stay empty
     // rather than inherit another salon's sample content.
     const blank = createBlankSalonData();
     const legacy: SalonData = {
       ...blank,
-      salonName: p.profile?.name || '',
-      about: p.profile?.description || '',
-      phone: p.profile?.phone || '',
-      email: p.profile?.email || '',
-      templateId: (p.template?.key as SalonData['templateId']) || blank.templateId,
+      salonName: payload.profile?.name || '',
+      about: payload.profile?.description || '',
+      phone: payload.profile?.phone || '',
+      email: payload.profile?.email || '',
+      templateId: (payload.template?.key as SalonData['templateId']) || blank.templateId,
       address: {
         ...(blank.address ?? {
           fullAddress: '',
@@ -199,12 +260,12 @@ function extractSalonData(payload: unknown): { data: SalonData | null; step: num
           state: '',
           pinCode: '',
         }),
-        fullAddress: p.profile?.address || '',
-        area: p.profile?.area || '',
-        city: p.profile?.city || '',
+        fullAddress: payload.profile?.address || '',
+        area: payload.profile?.area || '',
+        city: payload.profile?.city || '',
       },
-      services: Array.isArray(p.services)
-        ? p.services.map((s: any, i: number) => ({
+      services: Array.isArray(payload.services)
+        ? payload.services.map((s, i: number) => ({
             id: String(s.id ?? i + 1),
             name: String(s.name ?? ''),
             category: String(s.category ?? 'General'),
@@ -230,31 +291,6 @@ function toNumber(primary: unknown, fallback: unknown, dflt: number): number {
     }
   }
   return dflt;
-}
-
-/** salon_setup_proposals' payload column name is environment-dependent. */
-const PAYLOAD_COLUMN_CANDIDATES = ['payload', 'proposal_payload', 'setup_payload', 'data', 'content'];
-
-function findPayload(row: Record<string, any>): unknown {
-  for (const col of PAYLOAD_COLUMN_CANDIDATES) {
-    const value = row[col];
-    if (value && typeof value === 'object') return value;
-    if (typeof value === 'string' && value.trim().startsWith('{')) {
-      try {
-        return JSON.parse(value);
-      } catch {
-        /* not JSON — keep looking */
-      }
-    }
-  }
-  // Last resort: any object column that looks like our payload.
-  for (const value of Object.values(row)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const v = value as Record<string, unknown>;
-      if ('onboarding' in v || 'profile' in v) return v;
-    }
-  }
-  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +337,7 @@ export async function loadWebsiteOnboarding(
   try {
     const { data, error } = await client
       .from('salon_setup_proposals')
-      .select('*')
+      .select('id, growth_partner_id, salon_id, application_id, status, payload, submitted_at, created_at, updated_at')
       .eq('growth_partner_id', partnerId)
       .eq('salon_id', salonId)
       .order('updated_at', { ascending: false })
@@ -312,10 +348,10 @@ export async function loadWebsiteOnboarding(
       return { ...fallback(`Could not read the saved website draft: ${error.message}`), applicationId };
     }
 
-    const row = (data ?? [])[0] as Record<string, any> | undefined;
+    const row = (data ?? [])[0] as Record<string, unknown> | undefined;
     if (!row) return { ...fallback(null), applicationId };
 
-    const extracted = extractSalonData(findPayload(row));
+    const extracted = extractSalonData(parsePayload(row.payload));
     if (!extracted.data) return { ...fallback(null), applicationId };
 
     const remoteUpdatedAt = row.updated_at ? String(row.updated_at) : null;
@@ -362,31 +398,41 @@ async function ensureApplication(
   client: SupabaseClient,
   opts: { partnerId: string; salonId: string; applicationId: string | null; data: SalonData; step: number },
 ): Promise<string> {
+  const shopName = (opts.data.salonName ?? '').trim();
+  const progressFields = {
+    current_step: opts.step,
+    shop_name: shopName,
+    website_template: opts.data.templateId ?? 'hair',
+  };
+
   if (opts.applicationId) {
     // Best-effort progress update; never block the save on it.
     await client
       .from('shop_onboarding_applications')
-      .update({
-        current_step: opts.step,
-        shop_name: (opts.data.salonName ?? '').trim(),
-        website_template: opts.data.templateId ?? 'hair',
-      })
+      .update(progressFields)
       .eq('id', opts.applicationId)
       .then(undefined, () => undefined);
     return opts.applicationId;
   }
 
+  // Reuse the shared find-or-create so an application created by the AddShop
+  // flow (a brand-new shop whose existing_salon_id is null) is found again here
+  // by exact shop_name instead of inserting a duplicate row. See
+  // gpRepository.findOrCreateShopApplication.
   const hours = firstOpenDay(opts.data);
-  const { data, error } = await client
-    .from('shop_onboarding_applications')
-    .insert({
+  const { applicationId } = await findOrCreateShopApplication(client, {
+    partnerId: opts.partnerId,
+    existingSalonId: opts.salonId,
+    shopName,
+    updateFields: progressFields,
+    createFields: {
       submitted_by_partner_id: opts.partnerId,
       existing_salon_id: opts.salonId,
       status: 'draft',
       current_step: opts.step,
       owner_email: (opts.data.email ?? '').trim().toLowerCase(),
       owner_phone: (opts.data.phone ?? '').trim(),
-      shop_name: (opts.data.salonName ?? '').trim(),
+      shop_name: shopName,
       city: (opts.data.address?.city ?? '').trim(),
       locality: (opts.data.address?.area ?? '').trim(),
       full_address: (opts.data.address?.fullAddress ?? '').trim(),
@@ -394,11 +440,9 @@ async function ensureApplication(
       closing_time: hours.closes,
       about_shop: (opts.data.about ?? '').trim(),
       website_template: opts.data.templateId ?? 'hair',
-    })
-    .select('id')
-    .single();
-  if (error) throw error;
-  return String(data.id);
+    },
+  });
+  return applicationId;
 }
 
 export async function saveWebsiteOnboarding(
